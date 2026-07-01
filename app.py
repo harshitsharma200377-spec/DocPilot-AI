@@ -12,10 +12,10 @@ from splitter import split_documents
 from vectorstore import create_vectorstore
 from rag_chain import create_rag_chain, ask_question
 
-# Planner Agent
 from agents.planner_agent import PlannerAgent
 from agents.summarizer_agent import SummarizerAgent
 from agents.comparison_agent import ComparisonAgent
+
 # =====================================
 # Page Configuration
 # =====================================
@@ -32,7 +32,7 @@ os.makedirs("data", exist_ok=True)
 os.makedirs("faiss_db", exist_ok=True)
 
 # =====================================
-# Session State Initialization
+# Session State
 # =====================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -46,10 +46,10 @@ if "llm" not in st.session_state:
 if "retriever" not in st.session_state:
     st.session_state.retriever = None
 
-# Initialize Planner Agent
 planner = PlannerAgent()
 summarizer = SummarizerAgent()
 comparison = ComparisonAgent()
+
 # =====================================
 # Sidebar
 # =====================================
@@ -75,11 +75,8 @@ with st.sidebar:
     st.markdown("### 🧠 Agent Skills")
 
     st.success("✅ Question Answering")
-
     st.info("📝 Document Summarization")
-
     st.info("📊 Document Comparison")
-
     st.info("❓ Quiz Generation")
 
     st.divider()
@@ -97,16 +94,14 @@ st.caption(
     "An Intelligent AI Research Agent for Multi-Document Analysis"
 )
 
-st.write(
-    """
+st.write("""
 Upload one or multiple PDF documents and let DocPilot intelligently:
 
 - 📚 Answer Questions
 - 📝 Summarize Documents
 - 📊 Compare Information
 - ❓ Generate Quiz Questions
-"""
-)
+""")
 
 # =====================================
 # Process Documents
@@ -121,10 +116,7 @@ if process_button:
 
         for uploaded_file in uploaded_files:
 
-            file_path = os.path.join(
-                "data",
-                uploaded_file.name
-            )
+            file_path = os.path.join("data", uploaded_file.name)
 
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
@@ -146,12 +138,11 @@ if process_button:
         st.success(f"✅ {len(chunks)} chunks indexed successfully!")
 
 # =====================================
-# Display Chat History
+# Chat History
 # =====================================
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
-
         st.markdown(message["content"])
 
 # =====================================
@@ -171,7 +162,6 @@ if user_question:
     )
 
     with st.chat_message("user"):
-
         st.markdown(user_question)
 
     if not st.session_state.rag_ready:
@@ -195,24 +185,20 @@ if user_question:
             elif task == "summarize":
 
                 reply = summarizer.summarize(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                        "Provide a concise summary of the uploaded documents."
-                    )
-                
+                    st.session_state.llm,
+                    st.session_state.retriever
+                )
 
             elif task == "compare":
 
-               reply = comparison.compare(
+                reply = comparison.compare(
                     st.session_state.llm,
                     st.session_state.retriever
                 )
 
             elif task == "quiz":
 
-                reply = (
-                    "🚧 **Quiz Agent** is coming in the next update."
-                )
+                reply = "🚧 Quiz Agent is coming soon."
 
             else:
 
@@ -230,5 +216,4 @@ if user_question:
     )
 
     with st.chat_message("assistant"):
-
         st.markdown(reply)
