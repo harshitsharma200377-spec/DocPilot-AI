@@ -15,6 +15,7 @@ from rag_chain import create_rag_chain, ask_question
 # Planner Agent
 from agents.planner_agent import PlannerAgent
 from agents.summarizer_agent import SummarizerAgent
+from agents.comparison_agent import ComparisonAgent
 # =====================================
 # Page Configuration
 # =====================================
@@ -48,6 +49,7 @@ if "retriever" not in st.session_state:
 # Initialize Planner Agent
 planner = PlannerAgent()
 summarizer = SummarizerAgent()
+comparison = ComparisonAgent()
 # =====================================
 # Sidebar
 # =====================================
@@ -201,8 +203,9 @@ if user_question:
 
             elif task == "compare":
 
-                reply = (
-                    "🚧 **Comparison Agent** is coming in the next update."
+               reply = comparison.compare(
+                    st.session_state.llm,
+                    st.session_state.retriever
                 )
 
             elif task == "quiz":
