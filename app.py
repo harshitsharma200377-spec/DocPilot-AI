@@ -14,7 +14,7 @@ from rag_chain import create_rag_chain, ask_question
 
 # Planner Agent
 from agents.planner_agent import PlannerAgent
-
+from agents.summarizer_agent import SummarizerAgent
 # =====================================
 # Page Configuration
 # =====================================
@@ -47,7 +47,7 @@ if "retriever" not in st.session_state:
 
 # Initialize Planner Agent
 planner = PlannerAgent()
-
+summarizer = SummarizerAgent()
 # =====================================
 # Sidebar
 # =====================================
@@ -192,14 +192,12 @@ if user_question:
 
             elif task == "summarize":
 
-                reply = (
-                    "## 📝 Document Summary\n\n"
-                    + ask_question(
+                reply = summarizer.summarize(
                         st.session_state.llm,
                         st.session_state.retriever,
                         "Provide a concise summary of the uploaded documents."
                     )
-                )
+                
 
             elif task == "compare":
 
