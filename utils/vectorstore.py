@@ -1,5 +1,5 @@
 from langchain_community.vectorstores import FAISS
-from embeddings import get_embeddings
+from .embeddings import get_embeddings
 
 def create_vectorstore(chunks):
     db = FAISS.from_documents(chunks, get_embeddings())
