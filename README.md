@@ -60,42 +60,6 @@ Instead of routing every query through a single pipeline, DocPilot-AI uses a **P
 
 ---
 
-## 🚀 Setup & Installation
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/harshitsharma200377-spec/DocPilot-AI.git
-cd DocPilot-AI
-```
-
-### 2. Set up virtual environment
-```bash
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-```
-
-### 3. Install requirements
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Set Environment Variables
-Create a local `.env` file:
-```env
-GROQ_API_KEY=your-api-key-here
-```
-*Note: For Streamlit Cloud deployments, add `GROQ_API_KEY` to the app's Secrets manager.*
-
-### 5. Launch the application
-```bash
-streamlit run app.py
-```
-
----
-
 ## 🎯 Example Prompts
 
 Try these prompts to see different agents in action:
