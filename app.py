@@ -51,7 +51,7 @@ st.markdown("""
 
     .hero-subtitle {
         font-size: 1.05rem;
-        color: #9CA3AF;
+        color: #B4BAC4;
         margin-bottom: 1.4rem;
     }
 
@@ -72,7 +72,7 @@ st.markdown("""
 
     .feature-card p {
         margin: 0;
-        color: #9CA3AF;
+        color: #B4BAC4;
         font-size: 0.85rem;
     }
 
@@ -158,10 +158,51 @@ st.markdown("""
         text-transform: uppercase;
         padding: 0.15rem 0.55rem;
         border-radius: 999px;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.5rem;
         background: rgba(139, 92, 246, 0.15);
         color: #A78BFA;
         border: 1px solid rgba(139, 92, 246, 0.35);
+    }
+
+    /* ---------- Readability Fixes ---------- */
+    /* Streamlit's default markdown text renders too dim on dark backgrounds.
+       Force high-contrast text everywhere answers/content actually render. */
+    .stMarkdown, .stMarkdown p, .stMarkdown li,
+    [data-testid="stChatMessage"] p,
+    [data-testid="stChatMessage"] li,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li {
+        color: #F1F3F5 !important;
+        line-height: 1.65 !important;
+        font-size: 0.98rem !important;
+    }
+
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stMarkdownContainer"] h4 {
+        color: #FFFFFF !important;
+        margin-top: 0.9rem !important;
+        margin-bottom: 0.3rem !important;
+    }
+
+    [data-testid="stMarkdownContainer"] strong {
+        color: #FFFFFF !important;
+    }
+
+    /* Give chat bubbles a proper card surface instead of floating on bare black */
+    [data-testid="stChatMessage"] {
+        background: #161B22 !important;
+        border: 1px solid #262C36 !important;
+        border-radius: 14px !important;
+        padding: 1rem 1.1rem !important;
+        margin-bottom: 0.7rem !important;
+    }
+
+    /* Slightly distinguish the user's own messages */
+    [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+        background: #1A1F2B !important;
+        border: 1px solid #2E3543 !important;
     }
 
 </style>
