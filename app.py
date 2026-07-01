@@ -1,5 +1,23 @@
+"""
+DocPilot-AI — Streamlit entrypoint.
+
+This module wires the Streamlit UI to the multi-agent backend:
+
+    User -> Planner Agent (LLM intent classification)
+              -> Retrieval Agent   (retrieve / explain / search)
+              -> Summarizer Agent  (summarize)
+              -> Comparison Agent  (compare)
+              -> Quiz Agent        (quiz)
+
+The UI, theme, and layout are unchanged from the original app.py.
+Only the orchestration logic and response rendering were updated to
+support the new structured (dict-based) agent outputs and real
+multi-agent routing.
+"""
+
 import os
 import sys
+
 import streamlit as st
 
 # =====================================
@@ -15,6 +33,19 @@ from rag_chain import create_rag_chain, ask_question
 from agents.planner_agent import PlannerAgent
 from agents.summarizer_agent import SummarizerAgent
 from agents.comparison_agent import ComparisonAgent
+
+# QuizAgent and ConversationMemory are new components introduced by the
+# multi-agent upgrade. They are imported defensively so this app.py keeps
+# working even before those files exist / are upgraded.
+try:
+    from agents.quiz_agent import QuizAgent
+except ImportError:
+    QuizAgent = None
+
+try:
+    from memory import ConversationMemory
+except ImportError:
+    ConversationMemory = None
 
 # =====================================
 # Page Configuration
@@ -383,16 +414,250 @@ if "chunk_count" not in st.session_state:
 if "last_agent" not in st.session_state:
     st.session_state.last_agent = None
 
+if "memory" not in st.session_state:
+    st.session_state.memory = ConversationMemory() if ConversationMemory else None
+
+if "quiz_difficulty" not in st.session_state:
+    st.session_state.quiz_difficulty = "Medium"
+
+if "quiz_num_questions" not in st.session_state:
+    st.session_state.quiz_num_questions = 5
+
 planner = PlannerAgent()
 summarizer = SummarizerAgent()
 comparison = ComparisonAgent()
+quiz_agent = QuizAgent() if QuizAgent else None
 
+# Metadata used purely for sidebar/status/badge rendering.
+# Keys correspond to the *planner intents*, not necessarily distinct
+# backend agents — e.g. "explain" and "search" are routed to the
+# Retrieval Agent under the hood but are surfaced with their own label
+# so the user can see what the Planner actually decided.
 AGENT_META = {
     "retrieve":  {"label": "Retrieval Agent",   "icon": "🔎"},
+    "explain":   {"label": "Explain (Retrieval)", "icon": "💡"},
+    "search":    {"label": "Search (Retrieval)", "icon": "🔍"},
     "summarize": {"label": "Summarizer Agent",  "icon": "📝"},
     "compare":   {"label": "Comparison Agent",  "icon": "📊"},
     "quiz":      {"label": "Quiz Agent",        "icon": "❓"},
 }
+
+# Maps every planner intent onto the backend handler responsible for it.
+INTENT_TO_HANDLER = {
+    "retrieve": "retrieve",
+    "explain": "retrieve",
+    "search": "retrieve",
+    "summarize": "summarize",
+    "compare": "compare",
+    "quiz": "quiz",
+}
+
+
+# =====================================
+# Response Formatting Helpers
+# =====================================
+def _get_recent_chat_history(max_turns: int = 6):
+    """
+    Build a lightweight chat history list from session messages for
+    agents that support conversational follow-ups (Planner, Retrieval).
+
+    Returns a list of {"role": ..., "content": ...} dicts, most recent
+    `max_turns` exchanges only, to keep prompts small.
+    """
+    history = [
+        {"role": m["role"], "content": m["content"]}
+        for m in st.session_state.messages
+        if m["role"] in ("user", "assistant")
+    ]
+    return history[-max_turns:]
+
+
+def format_retrieve_response(data) -> str:
+    """Render a Retrieval Agent response (dict or legacy string) as markdown."""
+    if isinstance(data, str):
+        return data
+
+    if not isinstance(data, dict):
+        return str(data)
+
+    parts = []
+
+    answer = data.get("answer", "").strip()
+    if answer:
+        parts.append(answer)
+
+    key_points = data.get("key_points")
+    if key_points:
+        parts.append("**Key Points:**")
+        parts.append("\n".join(f"- {kp}" for kp in key_points))
+
+    confidence = data.get("confidence")
+    if confidence:
+        parts.append(f"**Confidence:** {confidence}")
+
+    sources = data.get("sources")
+    if sources:
+        lines = ["**Sources:**"]
+        for src in sources:
+            doc_name = src.get("document", "Unknown document")
+            chunk_count = src.get("chunk_count")
+            pages = src.get("pages")
+
+            line = f"- 📄 **{doc_name}**"
+            details = []
+            if pages:
+                details.append(f"pages: {', '.join(str(p) for p in pages)}")
+            if chunk_count is not None:
+                details.append(f"{chunk_count} chunk(s) used")
+            if details:
+                line += f" _({'; '.join(details)})_"
+            lines.append(line)
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts) if parts else "I couldn't find an answer in the documents."
+
+
+def format_summarize_response(data) -> str:
+    """Render a Summarizer Agent response (dict or legacy string) as markdown."""
+    if isinstance(data, str):
+        return data
+
+    if not isinstance(data, dict):
+        return str(data)
+
+    sections = [
+        ("📌 Executive Summary", data.get("executive_summary")),
+        ("🔑 Key Findings", data.get("key_findings")),
+        ("💡 Important Concepts", data.get("important_concepts")),
+        ("✅ Action Items", data.get("action_items")),
+        ("🏁 Conclusion", data.get("conclusion")),
+    ]
+
+    parts = []
+    for title, content in sections:
+        if not content:
+            continue
+        parts.append(f"**{title}**")
+        if isinstance(content, list):
+            parts.append("\n".join(f"- {item}" for item in content))
+        else:
+            parts.append(str(content))
+
+    return "\n\n".join(parts) if parts else "No summary could be generated."
+
+
+def format_compare_response(data) -> str:
+    """Render a Comparison Agent response (dict or legacy string) as markdown."""
+    if isinstance(data, str):
+        return data
+
+    if not isinstance(data, dict):
+        return str(data)
+
+    if data.get("single_document"):
+        note = data.get(
+            "message",
+            "Only one document is indexed, so a cross-document comparison "
+            "isn't possible. Upload at least two PDFs to compare them."
+        )
+        return f"⚠️ {note}"
+
+    parts = []
+
+    table = data.get("comparison_table")
+    if table:
+        # Accept either a pre-formatted markdown table string or a list
+        # of row dicts to render as a markdown table.
+        if isinstance(table, str):
+            parts.append("**📊 Comparison Table**\n\n" + table)
+        elif isinstance(table, list) and table:
+            headers = list(table[0].keys())
+            header_row = "| " + " | ".join(headers) + " |"
+            divider_row = "| " + " | ".join("---" for _ in headers) + " |"
+            body_rows = [
+                "| " + " | ".join(str(row.get(h, "")) for h in headers) + " |"
+                for row in table
+            ]
+            md_table = "\n".join([header_row, divider_row, *body_rows])
+            parts.append("**📊 Comparison Table**\n\n" + md_table)
+
+    list_sections = [
+        ("🤝 Similarities", data.get("similarities")),
+        ("⚡ Differences", data.get("differences")),
+        ("💪 Strengths", data.get("strengths")),
+        ("⚠️ Weaknesses", data.get("weaknesses")),
+        ("🧭 Recommendations", data.get("recommendations")),
+    ]
+
+    for title, content in list_sections:
+        if not content:
+            continue
+        parts.append(f"**{title}**")
+        if isinstance(content, list):
+            parts.append("\n".join(f"- {item}" for item in content))
+        else:
+            parts.append(str(content))
+
+    return "\n\n".join(parts) if parts else "No comparison could be generated."
+
+
+def format_quiz_response(data) -> str:
+    """Render a Quiz Agent response (dict or legacy string) as markdown."""
+    if isinstance(data, str):
+        return data
+
+    if not isinstance(data, dict):
+        return str(data)
+
+    parts = []
+    difficulty = data.get("difficulty")
+    if difficulty:
+        parts.append(f"**Difficulty:** {difficulty}")
+
+    mcqs = data.get("mcqs")
+    if mcqs:
+        lines = ["**📝 Multiple Choice Questions**"]
+        for i, q in enumerate(mcqs, start=1):
+            lines.append(f"\n{i}. {q.get('question', '')}")
+            for opt_letter, opt_text in q.get("options", {}).items():
+                lines.append(f"   - {opt_letter}) {opt_text}")
+            answer = q.get("answer")
+            if answer:
+                lines.append(f"   - ✅ **Answer:** {answer}")
+        parts.append("\n".join(lines))
+
+    true_false = data.get("true_false")
+    if true_false:
+        lines = ["**✅❌ True / False**"]
+        for i, q in enumerate(true_false, start=1):
+            lines.append(f"{i}. {q.get('statement', '')}")
+            answer = q.get("answer")
+            if answer is not None:
+                lines.append(f"   - **Answer:** {answer}")
+        parts.append("\n".join(lines))
+
+    short_answer = data.get("short_answer")
+    if short_answer:
+        lines = ["**✍️ Short Answer**"]
+        for i, q in enumerate(short_answer, start=1):
+            lines.append(f"{i}. {q.get('question', '')}")
+            answer = q.get("answer")
+            if answer:
+                lines.append(f"   - **Suggested Answer:** {answer}")
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts) if parts else "No quiz questions could be generated."
+
+
+FORMATTERS = {
+    "retrieve": format_retrieve_response,
+    "explain": format_retrieve_response,
+    "search": format_retrieve_response,
+    "summarize": format_summarize_response,
+    "compare": format_compare_response,
+    "quiz": format_quiz_response,
+}
+
 
 # =====================================
 # Sidebar
@@ -450,10 +715,31 @@ with st.sidebar:
 
     st.divider()
 
+    # ---------- Quiz Settings ----------
+    st.markdown("#### ❓ Quiz Settings")
+
+    st.session_state.quiz_difficulty = st.selectbox(
+        "Difficulty",
+        options=["Easy", "Medium", "Hard"],
+        index=["Easy", "Medium", "Hard"].index(st.session_state.quiz_difficulty),
+    )
+
+    st.session_state.quiz_num_questions = st.slider(
+        "Questions per quiz",
+        min_value=3,
+        max_value=10,
+        value=st.session_state.quiz_num_questions,
+    )
+
+    st.caption("Ask things like *\"quiz me on this document\"* to trigger the Quiz Agent.")
+
+    st.divider()
+
     # ---------- Agent Status Panel ----------
     st.markdown("#### 🧠 Agent Status")
 
-    for key, meta in AGENT_META.items():
+    for key in ["retrieve", "summarize", "compare", "quiz"]:
+        meta = AGENT_META[key]
         active_class = "active" if st.session_state.last_agent == key else ""
         st.markdown(f"""
         <div class="agent-pill {active_class}">
@@ -467,6 +753,8 @@ with st.sidebar:
     if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_agent = None
+        if st.session_state.memory and hasattr(st.session_state.memory, "clear"):
+            st.session_state.memory.clear()
         st.rerun()
 
 # =====================================
@@ -475,7 +763,7 @@ with st.sidebar:
 st.markdown('<p class="hero-title">DocPilot-AI</p>', unsafe_allow_html=True)
 st.markdown(
     '<p class="hero-subtitle">A multi-agent AI system that plans, retrieves, summarizes, '
-    'and compares information across your documents.</p>',
+    'compares, and quizzes you on your documents.</p>',
     unsafe_allow_html=True
 )
 
@@ -509,7 +797,7 @@ with feat_col4:
     st.markdown("""
     <div class="feature-card">
         <h4>❓ Quiz</h4>
-        <p>Auto-generated quiz questions. (Coming soon)</p>
+        <p>Auto-generated MCQs, true/false, and short answer questions.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -548,6 +836,11 @@ if process_button:
             st.session_state.rag_ready = True
             st.session_state.doc_names = [f.name for f in uploaded_files]
             st.session_state.chunk_count = len(chunks)
+
+            # Reset conversational memory whenever the knowledge base changes,
+            # since prior follow-up context no longer applies to a new corpus.
+            if ConversationMemory:
+                st.session_state.memory = ConversationMemory()
 
         st.success(f"✅ Knowledge base built — {len(chunks)} chunks indexed from {len(uploaded_files)} document(s).")
         st.rerun()
@@ -596,11 +889,22 @@ if user_question:
 
     else:
 
-        with st.spinner("🧠 Planner is choosing the right agent..."):
-            task = planner.plan(user_question)
-            agent_used = task if task in AGENT_META else "retrieve"
+        chat_history = _get_recent_chat_history()
 
-        st.session_state.last_agent = agent_used
+        with st.spinner("🧠 Planner is reasoning about the right agent..."):
+            # PlannerAgent.plan is expected to use the LLM to classify intent
+            # into one of: retrieve, summarize, compare, quiz, explain, search.
+            try:
+                intent = planner.plan(user_question, chat_history=chat_history)
+            except TypeError:
+                # Backward-compatible call for a planner that doesn't yet
+                # accept chat_history.
+                intent = planner.plan(user_question)
+
+        task = INTENT_TO_HANDLER.get(intent, "retrieve")
+        agent_used = intent if intent in AGENT_META else "retrieve"
+
+        st.session_state.last_agent = task
 
         agent_label = AGENT_META.get(agent_used, AGENT_META["retrieve"])["label"]
 
@@ -608,37 +912,80 @@ if user_question:
 
             if task == "retrieve":
 
-                reply = ask_question(
-                    st.session_state.llm,
-                    st.session_state.retriever,
-                    user_question
-                )
+                try:
+                    raw_reply = ask_question(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        user_question,
+                        chat_history=chat_history,
+                    )
+                except TypeError:
+                    raw_reply = ask_question(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        user_question,
+                    )
+
+                reply = format_retrieve_response(raw_reply)
 
             elif task == "summarize":
 
-                reply = summarizer.summarize(
-                    st.session_state.llm,
-                    st.session_state.retriever
-                )
+                try:
+                    raw_reply = summarizer.summarize(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        doc_names=st.session_state.doc_names,
+                    )
+                except TypeError:
+                    raw_reply = summarizer.summarize(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                    )
+
+                reply = format_summarize_response(raw_reply)
 
             elif task == "compare":
 
-                reply = comparison.compare(
-                    st.session_state.llm,
-                    st.session_state.retriever
-                )
+                try:
+                    raw_reply = comparison.compare(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        doc_names=st.session_state.doc_names,
+                    )
+                except TypeError:
+                    raw_reply = comparison.compare(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                    )
+
+                reply = format_compare_response(raw_reply)
 
             elif task == "quiz":
 
-                reply = "🚧 Quiz Agent is coming soon."
+                if quiz_agent is None:
+                    reply = "🚧 Quiz Agent is not available yet — add `agents/quiz_agent.py` to enable it."
+                else:
+                    raw_reply = quiz_agent.generate_quiz(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        difficulty=st.session_state.quiz_difficulty,
+                        num_questions=st.session_state.quiz_num_questions,
+                    )
+                    reply = format_quiz_response(raw_reply)
 
             else:
 
-                reply = ask_question(
+                raw_reply = ask_question(
                     st.session_state.llm,
                     st.session_state.retriever,
-                    user_question
+                    user_question,
                 )
+                reply = format_retrieve_response(raw_reply)
+
+        # Persist the exchange in conversational memory, if available, so
+        # follow-up questions can be answered with context.
+        if st.session_state.memory and hasattr(st.session_state.memory, "add_exchange"):
+            st.session_state.memory.add_exchange(user_question, reply)
 
     st.session_state.messages.append(
         {
