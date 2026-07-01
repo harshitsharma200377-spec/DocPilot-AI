@@ -4,17 +4,36 @@ from langchain_groq import ChatGroq
 
 
 class PlannerAgent:
+    """
+    Planner Agent — the routing brain of DocPilot-AI.
 
-    def __init__(self):
-        api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+    Uses an LLM to classify the user's intent and return the name of
+    the appropriate downstream agent: retrieve, summarize, compare, quiz.
+    """
+
+    def __init__(self, model_name="llama-3.1-8b-instant"):
+        try:
+            api_key = st.secrets["GROQ_API_KEY"]
+        except Exception:
+            api_key = os.getenv("GROQ_API_KEY", "")
+
         self.llm = ChatGroq(
             api_key=api_key,
-            model_name="llama-3.1-8b-instant",
+            model_name=model_name,
             temperature=0
         )
 
     def plan(self, query, chat_history=None):
+        """
+        Classify the user query into one of the four agent intents.
 
+        Args:
+            query:        The user's natural-language request.
+            chat_history: Optional recent conversation for context.
+
+        Returns:
+            str: One of 'retrieve', 'summarize', 'compare', 'quiz'.
+        """
         history_text = ""
         if chat_history:
             for msg in chat_history[-4:]:
@@ -22,7 +41,9 @@ class PlannerAgent:
                 content = msg.get("content", "")
                 history_text += f"{role}: {content}\n"
 
-        history_section = f"\nRecent conversation:\n{history_text}\n" if history_text else ""
+        history_section = (
+            f"\nRecent conversation:\n{history_text}\n" if history_text else ""
+        )
 
         prompt = f"""
 You are the planning brain of DocPilot-AI.
