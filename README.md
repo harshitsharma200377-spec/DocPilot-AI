@@ -1,118 +1,179 @@
-# 🧭 DocPilot-AI
-> **Intelligent Multi-Agent Document Intelligence System**
+# DocPilot-AI
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![Streamlit App](https://static.streamlit.io/badge-gradient.svg)](https://docpilot-ai-cjenve4gzhwdqc5rtnra8w.streamlit.app/)
-[![Groq Powered](https://img.shields.io/badge/LLM-Groq-orange.svg)](https://groq.com/)
-[![FAISS Store](https://img.shields.io/badge/VectorStore-FAISS-green.svg)](https://github.com/facebookresearch/faiss)
+Intelligent multi-agent document research assistant built with Streamlit, LangChain, Groq, HuggingFace embeddings, and FAISS.
 
-DocPilot-AI is a production-inspired document intelligence application built as a capstone project for the Kaggle & Google course/competition. Unlike static Retrieval-Augmented Generation (RAG) pipelines, DocPilot-AI implements a true **Multi-Agent Orchestration Architecture** where user queries are dynamically analyzed and routed to specialized specialized agents.
+DocPilot-AI lets users upload PDF documents, build a local vector index, and ask natural-language questions. A planner agent routes each request to the most suitable workflow: retrieval, summarization, comparison, or quiz generation.
 
----
+[Live Demo](https://docpilot-ai-cjenve4gzhwdqc5rtnra8w.streamlit.app/) | [Repository](https://github.com/harshitsharma200377-spec/DocPilot-AI) | [Author](#author)
 
-## 🧠 System Architecture
+## Why This Is an Agent System
 
-Instead of routing every query through a single pipeline, DocPilot-AI uses a **Planner Agent** to inspect incoming user requests, classify the user's intent, and delegate execution to the most suited downstream agent.
+Most document Q&A apps use a fixed pipeline:
 
 ```text
-               [User Query]
-                    │
-                    ▼
-           ┌─────────────────┐
-           │  Planner Agent  │  <─── (Routes dynamically based on intent)
-           └────────┬────────┘
-                    │
-      ┌─────────────┼─────────────┬─────────────┐
-      │             │             │             │
-      ▼             ▼             ▼             ▼
-┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐
-│ Retrieval │ │Summarizer │ │Comparison │ │   Quiz    │
-│   Agent   │ │   Agent   │ │   Agent   │ │   Agent   │
-└─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
-      │             │             │             │
-      └─────────────┼─────────────┴─────────────┘
-                    │
-                    ▼
-            [Streamlit UI]
+embed -> retrieve -> answer
 ```
 
-### The Agent Registry
-* **Planner Agent:** Inspects the query and decides the downstream intent using few-shot classifications (`llama-3.1-8b-instant`).
-* **Retrieval Agent:** Handles grounded QA over document chunks. Formats responses with semantic highlights, confidence levels, and **page-level sources**.
-* **Summarizer Agent:** Generates executive-style structured document summaries (Executive Summary, Key Findings, Insights, Conclusion).
-* **Comparison Agent:** Performs cross-document comparison tables and analyzes differences/similarities when multiple files are uploaded.
-* **Quiz Agent:** Generates interactive study quizzes containing MCQs, True/False, and short answers derived from the corpus.
+DocPilot-AI adds a planner agent before the document workflow. The planner reads the user's request and chooses the correct downstream agent:
 
----
+```text
+User query
+  |
+  v
+Planner Agent
+  |
+  +--> Retrieval Agent   -> grounded document Q&A
+  +--> Summarizer Agent  -> structured summaries
+  +--> Comparison Agent  -> multi-document comparison
+  +--> Quiz Agent        -> generated study questions
+  |
+  v
+Streamlit response
+```
 
-## 🛠️ Tech Stack & Design Choices
+## Features
 
-* **Streamlit UI:** Formatted with custom CSS themes to deliver a modern, premium dark-mode dashboard.
-* **LangChain:** Used to coordinate agent calls, wrap prompt templates, and construct conversational memory.
-* **Groq Inference:** Powering all agents with ultra-fast inference using `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`, or `mixtral-8x7b-32768`.
-* **HuggingFace Embeddings:** Utilizing `all-MiniLM-L6-v2` for local, high-quality vector embeddings.
-* **FAISS Vector Index:** In-memory vector store for fast, lightweight local semantic searches.
+- Upload and process multiple PDF files.
+- Extract text and split documents into searchable chunks.
+- Build a FAISS vector store using HuggingFace embeddings.
+- Route user requests with a Groq-powered planner agent.
+- Answer document questions with grounded context.
+- Summarize uploaded documents in a structured format.
+- Compare two or more PDFs.
+- Generate quizzes with multiple-choice, true/false, and short-answer questions.
+- Keep lightweight recent chat history for follow-up questions.
+- Use a polished dark Streamlit interface.
 
----
+## Tech Stack
 
-## ✨ Advanced Features
+| Technology | Role |
+| --- | --- |
+| Python | Core language |
+| Streamlit | Web app and UI |
+| LangChain | Retrieval and orchestration helpers |
+| Groq | LLM inference |
+| HuggingFace | Embedding model |
+| FAISS | Vector similarity search |
+| PyPDF | PDF extraction |
+| python-dotenv | Local environment variables |
 
-* **LLM Model Switcher:** Instantly swap between models directly from the UI sidebar without rebuilding the vector store.
-* **Page-Level Citations:** Source citations list exact page numbers (e.g. `Page: 3, 7`) extracted from PDF metadata.
-* **Chat History Memory:** Lightweight sliding-window memory maintains conversation context for multi-turn Q&A.
-* **Download Chat History:** Export complete conversation logs as clean Markdown documents with a single click.
+## Project Structure
 
----
+```text
+DocPilot-AI/
+├── agents/
+│   ├── __init__.py
+│   ├── planner_agent.py
+│   ├── summarizer_agent.py
+│   ├── comparison_agent.py
+│   └── quiz_agent.py
+├── utils/
+│   ├── __init__.py
+│   ├── loader.py
+│   ├── splitter.py
+│   ├── embeddings.py
+│   ├── vectorstore.py
+│   ├── rag_chain.py
+│   └── memory.py
+├── screenshots/
+├── app.py
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
 
-## 🚀 Setup & Installation
+Runtime folders such as `data/` and `faiss_db/` are created by the app and should not be committed.
+
+## Installation
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/harshitsharma200377-spec/DocPilot-AI.git
 cd DocPilot-AI
 ```
 
-### 2. Set up virtual environment
+### 2. Create and activate a virtual environment
+
 ```bash
 python -m venv venv
-# Windows:
+```
+
+Windows:
+
+```bash
 venv\Scripts\activate
-# macOS/Linux:
+```
+
+macOS/Linux:
+
+```bash
 source venv/bin/activate
 ```
 
-### 3. Install requirements
+### 3. Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set Environment Variables
-Create a local `.env` file:
-```env
-GROQ_API_KEY=your-api-key-here
-```
-*Note: For Streamlit Cloud deployments, add `GROQ_API_KEY` to the app's Secrets manager.*
+### 4. Configure environment variables
 
-### 5. Launch the application
+Create a `.env` file in the project root:
+
+```env
+GROQ_API_KEY=your_groq_api_key
+HUGGINGFACEHUB_API_TOKEN=your_huggingface_token
+```
+
+For Streamlit Cloud, add the same keys in the app secrets settings.
+
+### 5. Run the app
+
 ```bash
 streamlit run app.py
 ```
 
----
+Then open:
 
-## 🎯 Example Prompts
+```text
+http://localhost:8501
+```
 
-Try these prompts to see different agents in action:
-* **Retrieve:** *"What is the main finding in Section 4?"*
-* **Summarize:** *"Create a summary highlighting key takeaways."*
-* **Compare:** *"Compare the methodologies used in document A and B."*
-* **Quiz:** *"Quiz me on this document with 5 hard questions."*
+## Example Prompts
 
----
+```text
+Summarize this document.
+What are the key findings in chapter 3?
+Compare the conclusions of both PDFs.
+Who is the author, and what is the main argument?
+Create a medium difficulty quiz from this document.
+```
 
-## 👤 Author
+## Notes
+
+- The app currently supports PDF files.
+- Comparison works best after uploading at least two PDFs.
+- Retrieval quality depends on PDF text quality and chunk relevance.
+- Scanned PDFs may require OCR before upload.
+
+## Roadmap
+
+- Add page-level source citations.
+- Add confidence scoring for retrieved answers.
+- Add OCR support for scanned PDFs.
+- Add DOCX and TXT ingestion.
+- Add persistent conversation storage.
+- Improve evaluation for retrieval quality.
+
+## Author
 
 **Harshit Sharma**  
-*Data Analyst & Generative AI Engineer*
-* [LinkedIn](https://linkedin.com/in/harshit-sharma-8b2906386)
-* [GitHub](https://github.com/harshitsharma200377-spec)
+Data Analyst, Generative AI Enthusiast, and Python Developer
+
+- [LinkedIn](https://linkedin.com/in/harshit-sharma-8b2906386)
+- [GitHub](https://github.com/harshitsharma200377-spec)
+
+## Support
+
+If this project is useful, consider starring the [repository](https://github.com/harshitsharma200377-spec/DocPilot-AI).
