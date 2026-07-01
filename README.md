@@ -8,7 +8,7 @@ Built with **Python**, **Streamlit**, **LangChain**, **ChromaDB**, **Groq LLM**,
 
 ## 🌐 Live Demo
 
-🔗 https://smart-pdf-rag-chatbot-xwsz2jpturhhkrfyh2afbk.streamlit.app/
+🔗 [https://smart-pdf-rag-chatbot-xwsz2jpturhhkrfyh2afbk.streamlit.app/](https://docpilot-ai-cjenve4gzhwdqc5rtnra8w.streamlit.app/)
 
 ---
 
