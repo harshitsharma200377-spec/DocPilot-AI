@@ -1,14 +1,21 @@
-from langchain_groq import ChatGroq
 import os
 from dotenv import load_dotenv
+
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
 
 def create_rag_chain(vectorstore):
+    """
+    Creates the Groq LLM and document retriever.
+    """
+
     llm = ChatGroq(
         api_key=os.getenv("GROQ_API_KEY"),
-        model_name="llama-3.1-8b-instant"
+        model_name="llama-3.1-8b-instant",
+        temperature=0
     )
 
     retriever = vectorstore.as_retriever(
@@ -19,45 +26,84 @@ def create_rag_chain(vectorstore):
 
 
 def ask_question(llm, retriever, query):
+    """
+    Retrieves relevant document chunks and generates an answer.
+    """
 
     docs = retriever.invoke(query)
 
     if not docs:
-        return "I couldn't find relevant information in the uploaded documents."
+        return (
+            "❌ I couldn't find any relevant information in the uploaded documents."
+        )
 
     context = "\n\n".join(
         [doc.page_content for doc in docs]
     )
 
-    prompt = f"""
-You are DocPilot-AI.
+    # Get unique source names
+    sources = set()
 
-You are an intelligent AI Research Agent.
+    for doc in docs:
+        source = doc.metadata.get("source", "Unknown Document")
+        source = os.path.basename(source)
+        sources.add(source)
+
+    prompt = ChatPromptTemplate.from_template(
+        """
+You are **DocPilot-AI**, an Intelligent AI Research Assistant.
 
 Your responsibilities:
 
 - Answer ONLY using the provided document context.
-- If the answer isn't present, clearly say:
-"I couldn't find that information in the uploaded documents."
+- Never invent facts.
+- If the answer is missing, clearly say:
+  "I couldn't find that information in the uploaded documents."
+- Keep responses professional and easy to understand.
 
-- Never make up information.
+Your response MUST follow this format:
 
-- Be concise.
+## 📌 Answer
 
-- Use bullet points whenever appropriate.
+(Provide the direct answer.)
 
-- End every answer with:
+## 🔑 Key Points
 
-📚 Sources:
-Mention how many document chunks were used.
+- Point 1
+- Point 2
+- Point 3
+
+## 📊 Confidence
+
+High / Medium / Low
 
 Context:
 {context}
 
-Question:
-{query}
+User Question:
+{question}
 """
+    )
 
-    response = llm.invoke(prompt)
+    final_prompt = prompt.format(
+        context=context,
+        question=query
+    )
 
-    return response.content + f"\n\n📚 Sources Used: {len(docs)} document chunks"
+    response = llm.invoke(final_prompt)
+
+    source_text = "\n".join(
+        [f"- {src}" for src in sorted(sources)]
+    )
+
+    return f"""
+{response.content}
+
+---
+
+## 📚 Sources
+
+{source_text}
+
+**Document Chunks Used:** {len(docs)}
+"""
