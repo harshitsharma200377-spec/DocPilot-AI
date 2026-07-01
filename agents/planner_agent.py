@@ -1,20 +1,28 @@
-from langchain_groq import ChatGroq
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
+import streamlit as st
+from langchain_groq import ChatGroq
 
 
 class PlannerAgent:
 
     def __init__(self):
+        api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
         self.llm = ChatGroq(
-            api_key=os.getenv("GROQ_API_KEY"),
+            api_key=api_key,
             model_name="llama-3.1-8b-instant",
             temperature=0
         )
 
-    def plan(self, query):
+    def plan(self, query, chat_history=None):
+
+        history_text = ""
+        if chat_history:
+            for msg in chat_history[-4:]:
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                history_text += f"{role}: {content}\n"
+
+        history_section = f"\nRecent conversation:\n{history_text}\n" if history_text else ""
 
         prompt = f"""
 You are the planning brain of DocPilot-AI.
@@ -35,13 +43,8 @@ Available Agents:
 4. quiz
 - Generate quiz questions from uploaded documents.
 
-Return ONLY one word.
-
-retrieve
-summarize
-compare
-quiz
-
+Return ONLY one word: retrieve / summarize / compare / quiz
+{history_section}
 User Request:
 
 {query}
@@ -51,10 +54,8 @@ User Request:
 
         if "summarize" in decision:
             return "summarize"
-
         elif "compare" in decision:
             return "compare"
-
         elif "quiz" in decision:
             return "quiz"
 
