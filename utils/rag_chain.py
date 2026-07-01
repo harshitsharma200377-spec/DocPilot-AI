@@ -16,14 +16,14 @@ def _get_api_key() -> str:
         return os.getenv("GROQ_API_KEY", "")
 
 
-def create_rag_chain(vectorstore):
+def create_rag_chain(vectorstore, model_name="llama-3.1-8b-instant"):
     """
     Creates the Groq LLM and document retriever.
     """
 
     llm = ChatGroq(
         api_key=_get_api_key(),
-        model_name="llama-3.1-8b-instant",
+        model_name=model_name,
         temperature=0
     )
 
