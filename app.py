@@ -21,24 +21,16 @@ import streamlit as st
 from utils.loader import load_documents
 from utils.splitter import split_documents
 from utils.vectorstore import create_vectorstore
-from utils.rag_chain import create_rag_chain, ask_question
+from utils.rag_chain import create_rag_chain
 
-from agents.planner_agent import PlannerAgent
-from agents.summarizer_agent import SummarizerAgent
-from agents.comparison_agent import ComparisonAgent
-
-# QuizAgent and ConversationMemory are new components introduced by the
-# multi-agent upgrade. They are imported defensively so this app.py keeps
-# working even before those files exist / are upgraded.
-try:
-    from agents.quiz_agent import QuizAgent
-except ImportError:
-    QuizAgent = None
-
-try:
-    from utils.memory import ConversationMemory
-except ImportError:
-    ConversationMemory = None
+from agents import (
+    PlannerAgent,
+    RetrievalAgent,
+    SummarizerAgent,
+    ComparisonAgent,
+    QuizAgent,
+)
+from utils.memory import ConversationMemory
 
 # =====================================
 # Page Configuration
@@ -673,6 +665,21 @@ with st.sidebar:
 
     st.divider()
 
+    # ---------- Model Selector ----------
+    st.markdown("#### LLM Model Selector")
+    selected_model = st.selectbox(
+        "Choose Groq LLM",
+        options=[
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+            "mixtral-8x7b-32768"
+        ],
+        index=0,
+        help="Select the LLM model to power all agents."
+    )
+
+    st.divider()
+
     # ---------- Knowledge Base Stats ----------
     st.markdown("#### Knowledge Base")
 
@@ -740,6 +747,26 @@ with st.sidebar:
             <div>{meta['icon']} {meta['label']}</div>
         </div>
         """, unsafe_allow_html=True)
+
+    # ---------- Export Conversation ----------
+    if st.session_state.messages:
+        st.markdown("#### Export Chat")
+        
+        # Build markdown text of the full conversation
+        export_text = "# DocPilot-AI Chat History\n\n"
+        for msg in st.session_state.messages:
+            role = msg["role"].upper()
+            content = msg["content"]
+            agent = f" (Agent: {msg.get('agent')})" if msg.get("agent") else ""
+            export_text += f"### **{role}**{agent}\n{content}\n\n---\n\n"
+            
+        st.download_button(
+            label="Download Chat (Markdown)",
+            data=export_text,
+            file_name="docpilot_chat_history.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
 
     st.divider()
 
@@ -822,7 +849,7 @@ if process_button:
 
             db = create_vectorstore(chunks)
 
-            llm, retriever = create_rag_chain(db)
+            llm, retriever = create_rag_chain(db, model_name=selected_model)
 
             st.session_state.llm = llm
             st.session_state.retriever = retriever
@@ -884,15 +911,18 @@ if user_question:
 
         chat_history = _get_recent_chat_history()
 
+        # Re-initialize LLM and Planner dynamically based on sidebar model selection
+        from langchain_groq import ChatGroq
+        from utils.rag_chain import _get_api_key
+        st.session_state.llm = ChatGroq(
+            api_key=_get_api_key(),
+            model_name=selected_model,
+            temperature=0
+        )
+        planner = PlannerAgent(model_name=selected_model)
+
         with st.spinner("Planner is reasoning about the right agent..."):
-            # PlannerAgent.plan is expected to use the LLM to classify intent
-            # into one of: retrieve, summarize, compare, quiz, explain, search.
-            try:
-                intent = planner.plan(user_question, chat_history=chat_history)
-            except TypeError:
-                # Backward-compatible call for a planner that doesn't yet
-                # accept chat_history.
-                intent = planner.plan(user_question)
+            intent = planner.plan(user_question, chat_history=chat_history)
 
         task = INTENT_TO_HANDLER.get(intent, "retrieve")
         agent_used = intent if intent in AGENT_META else "retrieve"
@@ -904,57 +934,32 @@ if user_question:
         with st.spinner(f"{agent_label} is working on your request..."):
 
             if task == "retrieve":
-
-                try:
-                    raw_reply = ask_question(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                        user_question,
-                        chat_history=chat_history,
-                    )
-                except TypeError:
-                    raw_reply = ask_question(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                        user_question,
-                    )
-
+                retrieval_agent = RetrievalAgent()
+                raw_reply = retrieval_agent.retrieve(
+                    st.session_state.llm,
+                    st.session_state.retriever,
+                    user_question,
+                    chat_history=chat_history,
+                )
                 reply = format_retrieve_response(raw_reply)
 
             elif task == "summarize":
-
-                try:
-                    raw_reply = summarizer.summarize(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                        doc_names=st.session_state.doc_names,
-                    )
-                except TypeError:
-                    raw_reply = summarizer.summarize(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                    )
-
+                raw_reply = summarizer.summarize(
+                    st.session_state.llm,
+                    st.session_state.retriever,
+                    doc_names=st.session_state.doc_names,
+                )
                 reply = format_summarize_response(raw_reply)
 
             elif task == "compare":
-
-                try:
-                    raw_reply = comparison.compare(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                        doc_names=st.session_state.doc_names,
-                    )
-                except TypeError:
-                    raw_reply = comparison.compare(
-                        st.session_state.llm,
-                        st.session_state.retriever,
-                    )
-
+                raw_reply = comparison.compare(
+                    st.session_state.llm,
+                    st.session_state.retriever,
+                    doc_names=st.session_state.doc_names,
+                )
                 reply = format_compare_response(raw_reply)
 
             elif task == "quiz":
-
                 if quiz_agent is None:
                     reply = "Quiz Agent is not available yet. Add `agents/quiz_agent.py` to enable it."
                 else:
@@ -967,11 +972,12 @@ if user_question:
                     reply = format_quiz_response(raw_reply)
 
             else:
-
-                raw_reply = ask_question(
+                retrieval_agent = RetrievalAgent()
+                raw_reply = retrieval_agent.retrieve(
                     st.session_state.llm,
                     st.session_state.retriever,
                     user_question,
+                    chat_history=chat_history,
                 )
                 reply = format_retrieve_response(raw_reply)
 
