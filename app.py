@@ -173,6 +173,7 @@ if user_question:
         with st.spinner("🧠 DocPilot is planning the best response..."):
 
             task = planner.plan(user_question)
+            st.info(f"🧠 Planner selected: **{task.upper()}** agent")
 
             if task == "retrieve":
 
