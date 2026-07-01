@@ -1,172 +1,134 @@
-<div align="center">
+# DocPilot-AI
 
-# 🧭 DocPilot-AI
+Intelligent multi-agent document research assistant built with Streamlit, LangChain, Groq, HuggingFace embeddings, and FAISS.
 
-### Intelligent Multi-Agent Document Research Assistant
+DocPilot-AI lets users upload PDF documents, build a local vector index, and ask natural-language questions. A planner agent routes each request to the most suitable workflow: retrieval, summarization, comparison, or quiz generation.
 
-**Upload documents. Ask naturally. Let specialized AI agents plan, retrieve, summarize, and compare — with grounded, citation-backed answers.**
+[Live Demo](https://docpilot-ai-cjenve4gzhwdqc5rtnra8w.streamlit.app/) | [Repository](https://github.com/harshitsharma200377-spec/DocPilot-AI) | [Author](#author)
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![LangChain](https://img.shields.io/badge/LangChain-Orchestration-1C3C3C?style=flat-square)](https://www.langchain.com/)
-[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.1-F55036?style=flat-square)](https://groq.com/)
-[![FAISS](https://img.shields.io/badge/FAISS-Vector_Search-0467DF?style=flat-square)](https://github.com/facebookresearch/faiss)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+## Why This Is an Agent System
 
-**Built for the Kaggle Competition:** *AI Agents — Intensive Vibe Coding Capstone Project with Google*
+Most document Q&A apps use a fixed pipeline:
 
-[🌐 Live Demo](https://docpilot-ai-cjenve4gzhwdqc5rtnra8w.streamlit.app/) · [📂 Repository](https://github.com/harshitsharma200377-spec/DocPilot-AI) · [👤 Author](#-author)
-
-</div>
-
----
-
-## 🧠 What Makes This an *Agent* System (Not Just RAG)
-
-Most document Q&A tools run a single fixed pipeline: embed → retrieve → answer. DocPilot-AI instead uses a **Planner Agent** that reads the user's intent and dynamically routes the request to the specialized agent best suited to handle it — retrieval, summarization, or comparison — each with its own prompting strategy and output structure.
-
-This means the system *reasons about what kind of task it's facing* before acting, rather than treating every question the same way.
-
----
-
-## 🤖 Agent Architecture
-
-```
-                         ┌─────────────────────┐
-                         │      User Query       │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌─────────────────────┐
-                         │    Planner Agent      │
-                         │ (Groq LLM — intent     │
-                         │  classification)       │
-                         └──────────┬───────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              ▼                     ▼                     ▼
-    ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-    │  Retrieval Agent   │ │ Summarizer Agent  │ │ Comparison Agent  │
-    │  FAISS semantic     │ │ Structured multi-  │ │ Cross-document     │
-    │  search + grounded  │ │ section summaries  │ │ analysis tables    │
-    │  citations          │ │                    │ │                    │
-    └──────────┬─────────┘ └──────────┬─────────┘ └──────────┬─────────┘
-               │                       │                       │
-               └───────────────────────┼───────────────────────┘
-                                        ▼
-                         ┌─────────────────────┐
-                         │  Context-Aware Answer │
-                         │   (Streamlit UI)       │
-                         └─────────────────────┘
+```text
+embed -> retrieve -> answer
 ```
 
-### Agent Roles
+DocPilot-AI adds a planner agent before the document workflow. The planner reads the user's request and chooses the correct downstream agent:
 
-| Agent | Responsibility |
-|---|---|
-| **Planner Agent** | Uses Groq LLM to classify the user's intent into `retrieve`, `summarize`, `compare`, or `quiz`, and routes to the correct downstream agent. |
-| **Retrieval Agent** | Runs semantic search over the FAISS vector store, pulls the most relevant chunks, and generates grounded answers using Groq inference. |
-| **Summarizer Agent** | Produces structured summaries (Executive Summary, Key Findings, Insights, Action Items, Conclusion) instead of a single paragraph dump. |
-| **Comparison Agent** | Compares two or more uploaded documents, highlighting similarities, differences, and generating comparative tables. |
+```text
+User query
+  |
+  v
+Planner Agent
+  |
+  +--> Retrieval Agent   -> grounded document Q&A
+  +--> Summarizer Agent  -> structured summaries
+  +--> Comparison Agent  -> multi-document comparison
+  +--> Quiz Agent        -> generated study questions
+  |
+  v
+Streamlit response
+```
 
----
+## Features
 
-## ✨ Features
+- Upload and process multiple PDF files.
+- Extract text and split documents into searchable chunks.
+- Build a FAISS vector store using HuggingFace embeddings.
+- Route user requests with a Groq-powered planner agent.
+- Answer document questions with grounded context.
+- Summarize uploaded documents in a structured format.
+- Compare two or more PDFs.
+- Generate quizzes with multiple-choice, true/false, and short-answer questions.
+- Keep lightweight recent chat history for follow-up questions.
+- Use a polished dark Streamlit interface.
 
-- 📄 Upload and process multiple PDF documents simultaneously
-- 🧩 Automatic text extraction and intelligent chunking
-- 🔎 Semantic search powered by HuggingFace embeddings + FAISS
-- 🧭 LLM-driven Planner Agent for dynamic task routing
-- 💬 Multi-document, context-aware question answering
-- 📝 Structured summarization (not just raw text compression)
-- 📊 Multi-document comparison with tabular output
-- ⚡ Low-latency inference via Groq LLaMA 3.1
-- 🖥️ Clean, professional Streamlit interface
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Role |
-|---|---|
-| **Python** | Core language |
-| **Streamlit** | Web application / UI layer |
-| **LangChain** | Agent orchestration and RAG pipeline |
-| **Groq (LLaMA 3.1)** | LLM inference for planning, retrieval, summarization, comparison |
-| **HuggingFace** | Embedding models |
-| **FAISS** | Vector similarity search |
-| **PyPDF** | PDF text extraction |
-| **python-dotenv** | Environment configuration |
+| --- | --- |
+| Python | Core language |
+| Streamlit | Web app and UI |
+| LangChain | Retrieval and orchestration helpers |
+| Groq | LLM inference |
+| HuggingFace | Embedding model |
+| FAISS | Vector similarity search |
+| PyPDF | PDF extraction |
+| python-dotenv | Local environment variables |
 
----
+## Project Structure
 
-## 🗂️ Project Structure
-
-```
+```text
 DocPilot-AI/
-│
 ├── agents/
-│   ├── planner_agent.py        # Intent classification & routing
-│   ├── summarizer_agent.py     # Structured summarization
-│   └── comparison_agent.py     # Multi-document comparison
-│
+│   ├── __init__.py
+│   ├── planner_agent.py
+│   ├── summarizer_agent.py
+│   ├── comparison_agent.py
+│   └── quiz_agent.py
 ├── utils/
-│   ├── loader.py                # PDF text extraction
-│   ├── splitter.py              # Document chunking
-│   ├── embeddings.py            # HuggingFace embedding generation
-│   ├── vectorstore.py           # FAISS vector store management
-│   ├── rag_chain.py             # Retrieval + grounded generation
-│   └── memory.py                # Conversation memory
-│
-├── app.py                       # Streamlit UI entry point
+│   ├── __init__.py
+│   ├── loader.py
+│   ├── splitter.py
+│   ├── embeddings.py
+│   ├── vectorstore.py
+│   ├── rag_chain.py
+│   └── memory.py
+├── screenshots/
+├── app.py
 ├── requirements.txt
-├── README.md
-└── .env                         # (not committed) API keys
+├── .gitignore
+└── README.md
 ```
 
----
+Runtime folders such as `data/` and `faiss_db/` are created by the app and should not be committed.
 
-## 🚀 Installation
+## Installation
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/harshitsharma200377-spec/DocPilot-AI.git
 cd DocPilot-AI
 ```
 
-### 2. Create a Virtual Environment
+### 2. Create and activate a virtual environment
 
 ```bash
 python -m venv venv
 ```
 
-**Windows**
+Windows:
+
 ```bash
 venv\Scripts\activate
 ```
 
-**Linux / Mac**
+macOS/Linux:
+
 ```bash
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Configure environment variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 
-```
+```env
 GROQ_API_KEY=your_groq_api_key
 HUGGINGFACEHUB_API_TOKEN=your_huggingface_token
 ```
 
-### 5. Run the Application
+For Streamlit Cloud, add the same keys in the app secrets settings.
+
+### 5. Run the app
 
 ```bash
 streamlit run app.py
@@ -174,64 +136,44 @@ streamlit run app.py
 
 Then open:
 
-```
+```text
 http://localhost:8501
 ```
 
----
+## Example Prompts
 
-## 💡 Example Workflow
-
-1. Upload one or more PDF documents.
-2. Click **Process Documents** to build the FAISS index.
-3. Ask a question in natural language — the Planner Agent decides how to handle it.
-
-**Try prompts like:**
-
-```
+```text
 Summarize this document.
-What are the key findings in Chapter 3?
+What are the key findings in chapter 3?
 Compare the conclusions of both PDFs.
-Who is the author, and what is their main argument?
-Give me the action items from this report.
+Who is the author, and what is the main argument?
+Create a medium difficulty quiz from this document.
 ```
 
----
+## Notes
 
-## 🎯 Use Cases
+- The app currently supports PDF files.
+- Comparison works best after uploading at least two PDFs.
+- Retrieval quality depends on PDF text quality and chunk relevance.
+- Scanned PDFs may require OCR before upload.
 
-- 📚 Research paper analysis
-- 📑 Legal document review
-- 📊 Business & company report analysis
-- 📘 Study notes and exam prep
-- 📃 Technical documentation Q&A
-- 📖 Long-form book/report comprehension
+## Roadmap
 
----
+- Add page-level source citations.
+- Add confidence scoring for retrieved answers.
+- Add OCR support for scanned PDFs.
+- Add DOCX and TXT ingestion.
+- Add persistent conversation storage.
+- Improve evaluation for retrieval quality.
 
-## 🔮 Roadmap
+## Author
 
-- [ ] Source citations with page-level references
-- [ ] Confidence scoring on retrieved answers
-- [ ] Quiz Agent (auto-generated Q&A from documents)
-- [ ] Persistent conversational memory across sessions
-- [ ] OCR support for scanned PDFs
-- [ ] DOCX and TXT ingestion
-- [ ] Multi-modal document understanding (tables, images)
-- [ ] User authentication for multi-user deployments
+**Harshit Sharma**  
+Data Analyst, Generative AI Enthusiast, and Python Developer
 
----
+- [LinkedIn](https://linkedin.com/in/harshit-sharma-8b2906386)
+- [GitHub](https://github.com/harshitsharma200377-spec)
 
-## 👨‍💻 Author
+## Support
 
-**Harshit Sharma**
-Data Analyst · Generative AI Enthusiast · Python Developer
-
-- 🔗 [LinkedIn](https://linkedin.com/in/harshit-sharma-8b2906386)
-- 💻 [GitHub](https://github.com/harshitsharma200377-spec)
-
----
-
-## ⭐ Support
-
-If this project was useful or interesting, consider leaving a ⭐ on the [repository](https://github.com/harshitsharma200377-spec/DocPilot-AI) — it helps others discover it.
+If this project is useful, consider starring the [repository](https://github.com/harshitsharma200377-spec/DocPilot-AI).

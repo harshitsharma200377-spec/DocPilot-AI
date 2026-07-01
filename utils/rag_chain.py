@@ -25,7 +25,7 @@ def create_rag_chain(vectorstore):
     return llm, retriever
 
 
-def ask_question(llm, retriever, query):
+def ask_question(llm, retriever, query, chat_history=None):
     """
     Retrieves relevant document chunks and generates an answer.
     """
@@ -34,7 +34,7 @@ def ask_question(llm, retriever, query):
 
     if not docs:
         return (
-            "❌ I couldn't find any relevant information in the uploaded documents."
+            "I couldn't find any relevant information in the uploaded documents."
         )
 
     context = "\n\n".join(
@@ -49,6 +49,13 @@ def ask_question(llm, retriever, query):
         source = os.path.basename(source)
         sources.add(source)
 
+    history_text = ""
+    if chat_history:
+        history_text = "\n".join(
+            f"{message.get('role', 'user')}: {message.get('content', '')}"
+            for message in chat_history[-6:]
+        )
+
     prompt = ChatPromptTemplate.from_template(
         """
 You are **DocPilot-AI**, an Intelligent AI Research Assistant.
@@ -60,25 +67,29 @@ Your responsibilities:
 - If the answer is missing, clearly say:
   "I couldn't find that information in the uploaded documents."
 - Keep responses professional and easy to understand.
+- Use recent conversation only to understand follow-up questions. Do not use it as a source of facts.
 
 Your response MUST follow this format:
 
-## 📌 Answer
+## Answer
 
 (Provide the direct answer.)
 
-## 🔑 Key Points
+## Key Points
 
 - Point 1
 - Point 2
 - Point 3
 
-## 📊 Confidence
+## Confidence
 
 High / Medium / Low
 
 Context:
 {context}
+
+Recent Conversation:
+{chat_history}
 
 User Question:
 {question}
@@ -87,6 +98,7 @@ User Question:
 
     final_prompt = prompt.format(
         context=context,
+        chat_history=history_text or "No previous conversation.",
         question=query
     )
 
@@ -101,7 +113,7 @@ User Question:
 
 ---
 
-## 📚 Sources
+## Sources
 
 {source_text}
 

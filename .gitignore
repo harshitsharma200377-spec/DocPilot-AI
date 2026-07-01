@@ -1,5 +1,6 @@
 venv/
 chroma_db/
+faiss_db/
 .env
 __pycache__/
 *.pyc

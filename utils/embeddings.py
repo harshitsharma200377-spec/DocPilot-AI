@@ -9,5 +9,5 @@ def get_embeddings():
 if __name__ == "__main__":
     embeddings = get_embeddings()
     test = embeddings.embed_query("hello world")
-    print(f"✅ Embeddings working!")
+    print("Embeddings working!")
     print(f"Vector size: {len(test)}")

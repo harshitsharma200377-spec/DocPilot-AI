@@ -1,5 +1,5 @@
 """
-DocPilot-AI — Streamlit entrypoint.
+DocPilot-AI Streamlit entrypoint.
 
 This module wires the Streamlit UI to the multi-agent backend:
 
@@ -16,19 +16,12 @@ multi-agent routing.
 """
 
 import os
-import sys
-
 import streamlit as st
 
-# =====================================
-# Import Paths
-# =====================================
-sys.path.append(os.path.join(os.path.dirname(__file__), "utils"))
-
-from loader import load_documents
-from splitter import split_documents
-from vectorstore import create_vectorstore
-from rag_chain import create_rag_chain, ask_question
+from utils.loader import load_documents
+from utils.splitter import split_documents
+from utils.vectorstore import create_vectorstore
+from utils.rag_chain import create_rag_chain, ask_question
 
 from agents.planner_agent import PlannerAgent
 from agents.summarizer_agent import SummarizerAgent
@@ -43,7 +36,7 @@ except ImportError:
     QuizAgent = None
 
 try:
-    from memory import ConversationMemory
+    from utils.memory import ConversationMemory
 except ImportError:
     ConversationMemory = None
 
@@ -52,7 +45,7 @@ except ImportError:
 # =====================================
 st.set_page_config(
     page_title="DocPilot-AI",
-    page_icon="🧭",
+    page_icon=":material/description:",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -71,7 +64,7 @@ st.markdown("""
     #MainMenu, footer, header {visibility: hidden;}
 
     /* ============================================================
-       SIDEBAR — this was the root cause of the white/invisible UI.
+       SIDEBAR: this was the root cause of the white/invisible UI.
        Streamlit's sidebar is its own DOM node (data-testid="stSidebar")
        and does NOT inherit .stApp's background. Every rule below
        explicitly targets the sidebar so nothing falls back to the
@@ -430,16 +423,16 @@ quiz_agent = QuizAgent() if QuizAgent else None
 
 # Metadata used purely for sidebar/status/badge rendering.
 # Keys correspond to the *planner intents*, not necessarily distinct
-# backend agents — e.g. "explain" and "search" are routed to the
+# backend agents, e.g. "explain" and "search" are routed to the
 # Retrieval Agent under the hood but are surfaced with their own label
 # so the user can see what the Planner actually decided.
 AGENT_META = {
-    "retrieve":  {"label": "Retrieval Agent",   "icon": "🔎"},
-    "explain":   {"label": "Explain (Retrieval)", "icon": "💡"},
-    "search":    {"label": "Search (Retrieval)", "icon": "🔍"},
-    "summarize": {"label": "Summarizer Agent",  "icon": "📝"},
-    "compare":   {"label": "Comparison Agent",  "icon": "📊"},
-    "quiz":      {"label": "Quiz Agent",        "icon": "❓"},
+    "retrieve":  {"label": "Retrieval Agent",   "icon": "[R]"},
+    "explain":   {"label": "Explain (Retrieval)", "icon": "[E]"},
+    "search":    {"label": "Search (Retrieval)", "icon": "[S]"},
+    "summarize": {"label": "Summarizer Agent",  "icon": "[SUM]"},
+    "compare":   {"label": "Comparison Agent",  "icon": "[CMP]"},
+    "quiz":      {"label": "Quiz Agent",        "icon": "[Q]"},
 }
 
 # Maps every planner intent onto the backend handler responsible for it.
@@ -503,7 +496,7 @@ def format_retrieve_response(data) -> str:
             chunk_count = src.get("chunk_count")
             pages = src.get("pages")
 
-            line = f"- 📄 **{doc_name}**"
+            line = f"- **{doc_name}**"
             details = []
             if pages:
                 details.append(f"pages: {', '.join(str(p) for p in pages)}")
@@ -526,11 +519,11 @@ def format_summarize_response(data) -> str:
         return str(data)
 
     sections = [
-        ("📌 Executive Summary", data.get("executive_summary")),
-        ("🔑 Key Findings", data.get("key_findings")),
-        ("💡 Important Concepts", data.get("important_concepts")),
-        ("✅ Action Items", data.get("action_items")),
-        ("🏁 Conclusion", data.get("conclusion")),
+        ("Executive Summary", data.get("executive_summary")),
+        ("Key Findings", data.get("key_findings")),
+        ("Important Concepts", data.get("important_concepts")),
+        ("Action Items", data.get("action_items")),
+        ("Conclusion", data.get("conclusion")),
     ]
 
     parts = []
@@ -560,7 +553,7 @@ def format_compare_response(data) -> str:
             "Only one document is indexed, so a cross-document comparison "
             "isn't possible. Upload at least two PDFs to compare them."
         )
-        return f"⚠️ {note}"
+        return note
 
     parts = []
 
@@ -569,7 +562,7 @@ def format_compare_response(data) -> str:
         # Accept either a pre-formatted markdown table string or a list
         # of row dicts to render as a markdown table.
         if isinstance(table, str):
-            parts.append("**📊 Comparison Table**\n\n" + table)
+            parts.append("**Comparison Table**\n\n" + table)
         elif isinstance(table, list) and table:
             headers = list(table[0].keys())
             header_row = "| " + " | ".join(headers) + " |"
@@ -579,14 +572,14 @@ def format_compare_response(data) -> str:
                 for row in table
             ]
             md_table = "\n".join([header_row, divider_row, *body_rows])
-            parts.append("**📊 Comparison Table**\n\n" + md_table)
+            parts.append("**Comparison Table**\n\n" + md_table)
 
     list_sections = [
-        ("🤝 Similarities", data.get("similarities")),
-        ("⚡ Differences", data.get("differences")),
-        ("💪 Strengths", data.get("strengths")),
-        ("⚠️ Weaknesses", data.get("weaknesses")),
-        ("🧭 Recommendations", data.get("recommendations")),
+        ("Similarities", data.get("similarities")),
+        ("Differences", data.get("differences")),
+        ("Strengths", data.get("strengths")),
+        ("Weaknesses", data.get("weaknesses")),
+        ("Recommendations", data.get("recommendations")),
     ]
 
     for title, content in list_sections:
@@ -616,19 +609,19 @@ def format_quiz_response(data) -> str:
 
     mcqs = data.get("mcqs")
     if mcqs:
-        lines = ["**📝 Multiple Choice Questions**"]
+        lines = ["**Multiple Choice Questions**"]
         for i, q in enumerate(mcqs, start=1):
             lines.append(f"\n{i}. {q.get('question', '')}")
             for opt_letter, opt_text in q.get("options", {}).items():
                 lines.append(f"   - {opt_letter}) {opt_text}")
             answer = q.get("answer")
             if answer:
-                lines.append(f"   - ✅ **Answer:** {answer}")
+                lines.append(f"   - **Answer:** {answer}")
         parts.append("\n".join(lines))
 
     true_false = data.get("true_false")
     if true_false:
-        lines = ["**✅❌ True / False**"]
+        lines = ["**True / False**"]
         for i, q in enumerate(true_false, start=1):
             lines.append(f"{i}. {q.get('statement', '')}")
             answer = q.get("answer")
@@ -638,7 +631,7 @@ def format_quiz_response(data) -> str:
 
     short_answer = data.get("short_answer")
     if short_answer:
-        lines = ["**✍️ Short Answer**"]
+        lines = ["**Short Answer**"]
         for i, q in enumerate(short_answer, start=1):
             lines.append(f"{i}. {q.get('question', '')}")
             answer = q.get("answer")
@@ -664,10 +657,10 @@ FORMATTERS = {
 # =====================================
 with st.sidebar:
 
-    st.markdown('<p class="sidebar-brand">🧭 DocPilot-AI</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sidebar-brand">DocPilot-AI</p>', unsafe_allow_html=True)
     st.markdown('<p class="sidebar-tag">Multi-Agent Document Research Assistant</p>', unsafe_allow_html=True)
 
-    st.markdown("#### 📂 Upload Documents")
+    st.markdown("#### Upload Documents")
 
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
@@ -676,12 +669,12 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    process_button = st.button("🚀 Process Documents", use_container_width=True)
+    process_button = st.button("Process Documents", use_container_width=True)
 
     st.divider()
 
     # ---------- Knowledge Base Stats ----------
-    st.markdown("#### 📊 Knowledge Base")
+    st.markdown("#### Knowledge Base")
 
     stat_col1, stat_col2 = st.columns(2)
 
@@ -704,19 +697,19 @@ with st.sidebar:
     st.markdown("")
 
     if st.session_state.rag_ready:
-        st.success("✅ Knowledge base ready")
+        st.success("Knowledge base ready")
     else:
-        st.warning("⚠️ No documents indexed yet")
+        st.warning("No documents indexed yet")
 
     if st.session_state.doc_names:
-        with st.expander("📁 Indexed files"):
+        with st.expander("Indexed files"):
             for name in st.session_state.doc_names:
-                st.caption(f"• {name}")
+                st.caption(name)
 
     st.divider()
 
     # ---------- Quiz Settings ----------
-    st.markdown("#### ❓ Quiz Settings")
+    st.markdown("#### Quiz Settings")
 
     st.session_state.quiz_difficulty = st.selectbox(
         "Difficulty",
@@ -736,7 +729,7 @@ with st.sidebar:
     st.divider()
 
     # ---------- Agent Status Panel ----------
-    st.markdown("#### 🧠 Agent Status")
+    st.markdown("#### Agent Status")
 
     for key in ["retrieve", "summarize", "compare", "quiz"]:
         meta = AGENT_META[key]
@@ -750,7 +743,7 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("🗑️ Clear Chat", use_container_width=True):
+    if st.button("Clear Chat", use_container_width=True):
         st.session_state.messages = []
         st.session_state.last_agent = None
         if st.session_state.memory and hasattr(st.session_state.memory, "clear"):
@@ -758,7 +751,7 @@ with st.sidebar:
         st.rerun()
 
 # =====================================
-# Main Page — Hero
+# Main Page Hero
 # =====================================
 st.markdown('<p class="hero-title">DocPilot-AI</p>', unsafe_allow_html=True)
 st.markdown(
@@ -772,7 +765,7 @@ feat_col1, feat_col2, feat_col3, feat_col4 = st.columns(4)
 with feat_col1:
     st.markdown("""
     <div class="feature-card">
-        <h4>🔎 Retrieve</h4>
+        <h4>Retrieve</h4>
         <p>Grounded, semantic Q&A over your documents.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -780,7 +773,7 @@ with feat_col1:
 with feat_col2:
     st.markdown("""
     <div class="feature-card">
-        <h4>📝 Summarize</h4>
+        <h4>Summarize</h4>
         <p>Structured, executive-style document summaries.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -788,7 +781,7 @@ with feat_col2:
 with feat_col3:
     st.markdown("""
     <div class="feature-card">
-        <h4>📊 Compare</h4>
+        <h4>Compare</h4>
         <p>Cross-document analysis and comparison tables.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -796,7 +789,7 @@ with feat_col3:
 with feat_col4:
     st.markdown("""
     <div class="feature-card">
-        <h4>❓ Quiz</h4>
+        <h4>Quiz</h4>
         <p>Auto-generated MCQs, true/false, and short answer questions.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -821,7 +814,7 @@ if process_button:
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-        with st.spinner("🔄 Extracting text, chunking, and building the FAISS index..."):
+        with st.spinner("Extracting text, chunking, and building the FAISS index..."):
 
             docs = load_documents()
 
@@ -842,7 +835,7 @@ if process_button:
             if ConversationMemory:
                 st.session_state.memory = ConversationMemory()
 
-        st.success(f"✅ Knowledge base built — {len(chunks)} chunks indexed from {len(uploaded_files)} document(s).")
+        st.success(f"Knowledge base built: {len(chunks)} chunks indexed from {len(uploaded_files)} document(s).")
         st.rerun()
 
 # =====================================
@@ -885,13 +878,13 @@ if user_question:
 
     if not st.session_state.rag_ready:
 
-        reply = "⚠️ Please upload and process your documents first — I don't have a knowledge base to work with yet."
+        reply = "Please upload and process your documents first. I don't have a knowledge base to work with yet."
 
     else:
 
         chat_history = _get_recent_chat_history()
 
-        with st.spinner("🧠 Planner is reasoning about the right agent..."):
+        with st.spinner("Planner is reasoning about the right agent..."):
             # PlannerAgent.plan is expected to use the LLM to classify intent
             # into one of: retrieve, summarize, compare, quiz, explain, search.
             try:
@@ -908,7 +901,7 @@ if user_question:
 
         agent_label = AGENT_META.get(agent_used, AGENT_META["retrieve"])["label"]
 
-        with st.spinner(f"⚙️ {agent_label} is working on your request..."):
+        with st.spinner(f"{agent_label} is working on your request..."):
 
             if task == "retrieve":
 
@@ -963,7 +956,7 @@ if user_question:
             elif task == "quiz":
 
                 if quiz_agent is None:
-                    reply = "🚧 Quiz Agent is not available yet — add `agents/quiz_agent.py` to enable it."
+                    reply = "Quiz Agent is not available yet. Add `agents/quiz_agent.py` to enable it."
                 else:
                     raw_reply = quiz_agent.generate_quiz(
                         st.session_state.llm,
