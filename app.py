@@ -39,6 +39,111 @@ st.markdown("""
 
     #MainMenu, footer, header {visibility: hidden;}
 
+    /* ============================================================
+       SIDEBAR — this was the root cause of the white/invisible UI.
+       Streamlit's sidebar is its own DOM node (data-testid="stSidebar")
+       and does NOT inherit .stApp's background. Every rule below
+       explicitly targets the sidebar so nothing falls back to the
+       default light theme.
+       ============================================================ */
+    [data-testid="stSidebar"] {
+        background-color: #0B0E14 !important;
+        border-right: 1px solid #1F2530;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #0B0E14 !important;
+    }
+
+    /* Any plain text / labels / captions inside the sidebar */
+    [data-testid="stSidebar"] * {
+        color: #E5E7EB;
+    }
+
+    [data-testid="stSidebar"] .stCaption,
+    [data-testid="stSidebar"] small {
+        color: #9CA3AF !important;
+    }
+
+    /* ---------- Sidebar Buttons ---------- */
+    [data-testid="stSidebar"] .stButton > button {
+        background: linear-gradient(145deg, #1A2029, #161B22) !important;
+        color: #F1F3F5 !important;
+        border: 1px solid #2E3543 !important;
+        border-radius: 10px !important;
+        transition: all 0.2s ease;
+    }
+
+    [data-testid="stSidebar"] .stButton > button:hover {
+        border-color: #8B5CF6 !important;
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.35);
+        color: #FFFFFF !important;
+    }
+
+    /* ---------- File Uploader Dropzone ---------- */
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+        background: #161B22 !important;
+        border: 1px dashed #2E3543 !important;
+        border-radius: 12px !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
+        color: #B4BAC4 !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+        background: #1A2029 !important;
+        color: #F1F3F5 !important;
+        border: 1px solid #2E3543 !important;
+    }
+
+    /* Uploaded-file chip that appears after selecting a file */
+    [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+        background: #161B22 !important;
+        border-radius: 8px !important;
+        color: #E5E7EB !important;
+    }
+
+    /* ---------- Alerts (st.success / st.warning / st.error / st.info) ---------- */
+    [data-testid="stSidebar"] [data-testid="stAlert"],
+    .stApp [data-testid="stAlert"] {
+        background: #161B22 !important;
+        border: 1px solid #262C36 !important;
+        border-radius: 10px !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stAlert"] p,
+    .stApp [data-testid="stAlert"] p {
+        color: #F1F3F5 !important;
+    }
+
+    /* success = green accent border, warning = amber accent border */
+    [data-testid="stSidebar"] div[data-baseweb="notification"][kind="success"],
+    [data-testid="stSidebar"] .stSuccess {
+        border-left: 3px solid #22C55E !important;
+    }
+
+    [data-testid="stSidebar"] .stWarning {
+        border-left: 3px solid #F59E0B !important;
+    }
+
+    /* ---------- Expander ("Indexed files") ---------- */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        background: #161B22 !important;
+        border: 1px solid #262C36 !important;
+        border-radius: 10px !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        color: #E5E7EB !important;
+        background: #161B22 !important;
+    }
+
+    /* ---------- Divider ---------- */
+    [data-testid="stSidebar"] hr {
+        border-color: #262C36 !important;
+    }
+
     /* ---------- Hero ---------- */
     .hero-title {
         font-size: 2.6rem;
@@ -87,7 +192,7 @@ st.markdown("""
     }
 
     .sidebar-tag {
-        color: #6B7280;
+        color: #6B7280 !important;
         font-size: 0.78rem;
         margin-top: -6px;
         margin-bottom: 1rem;
@@ -105,12 +210,12 @@ st.markdown("""
     .kb-stat-value {
         font-size: 1.3rem;
         font-weight: 700;
-        color: #22D3EE;
+        color: #22D3EE !important;
     }
 
     .kb-stat-label {
         font-size: 0.72rem;
-        color: #9CA3AF;
+        color: #9CA3AF !important;
         text-transform: uppercase;
         letter-spacing: 0.03em;
     }
@@ -126,14 +231,14 @@ st.markdown("""
         padding: 0.5rem 0.7rem;
         margin-bottom: 0.45rem;
         font-size: 0.85rem;
-        color: #9CA3AF;
+        color: #9CA3AF !important;
         transition: all 0.2s ease;
     }
 
     .agent-pill.active {
         border: 1px solid #8B5CF6;
         box-shadow: 0 0 12px rgba(139, 92, 246, 0.35);
-        color: #E5E7EB;
+        color: #E5E7EB !important;
         background: linear-gradient(145deg, #1E1730, #161B22);
     }
 
@@ -203,6 +308,17 @@ st.markdown("""
     [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
         background: #1A1F2B !important;
         border: 1px solid #2E3543 !important;
+    }
+
+    /* ---------- Chat Input Box ---------- */
+    [data-testid="stChatInput"] {
+        background: #161B22 !important;
+        border: 1px solid #262C36 !important;
+        border-radius: 12px !important;
+    }
+
+    [data-testid="stChatInput"] textarea {
+        color: #F1F3F5 !important;
     }
 
 </style>
