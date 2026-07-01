@@ -1,6 +1,12 @@
 class ComparisonAgent:
 
-    def compare(self, llm, retriever):
+    def compare(self, llm, retriever, doc_names=None):
+
+        if doc_names and len(doc_names) < 2:
+            return {
+                "single_document": True,
+                "message": "Please upload at least 2 PDF documents to perform a comparison."
+            }
 
         docs = retriever.invoke("Compare all uploaded documents.")
 
@@ -8,10 +14,14 @@ class ComparisonAgent:
             [doc.page_content for doc in docs]
         )
 
+        doc_list = ""
+        if doc_names:
+            doc_list = "Comparing documents: " + ", ".join(doc_names) + "\n\n"
+
         prompt = f"""
 You are DocPilot-AI.
 
-Compare the uploaded documents.
+{doc_list}Compare the uploaded documents.
 
 Your answer should contain:
 
