@@ -311,14 +311,43 @@ st.markdown("""
     }
 
     /* ---------- Chat Input Box ---------- */
+    /* The chat input is a multi-layer widget (outer container > baseweb
+       wrapper > textarea). Each layer ships its own white background,
+       so every layer must be overridden explicitly or it falls back
+       to white-on-white like the sidebar did. */
     [data-testid="stChatInput"] {
         background: #161B22 !important;
         border: 1px solid #262C36 !important;
         border-radius: 12px !important;
     }
 
-    [data-testid="stChatInput"] textarea {
+    [data-testid="stChatInput"] > div,
+    [data-testid="stChatInput"] [data-baseweb="textarea"],
+    [data-testid="stChatInput"] [data-baseweb="base-input"] {
+        background: #161B22 !important;
+        border: none !important;
+    }
+
+    [data-testid="stChatInput"] textarea,
+    [data-testid="stChatInputTextArea"] {
+        background: #161B22 !important;
         color: #F1F3F5 !important;
+        caret-color: #F1F3F5 !important;
+    }
+
+    [data-testid="stChatInput"] textarea::placeholder {
+        color: #7C8493 !important;
+        opacity: 1 !important;
+    }
+
+    /* Send button */
+    [data-testid="stChatInput"] button {
+        background: #EF4444 !important;
+        border-radius: 8px !important;
+    }
+
+    [data-testid="stChatInput"] button svg {
+        fill: #FFFFFF !important;
     }
 
 </style>
