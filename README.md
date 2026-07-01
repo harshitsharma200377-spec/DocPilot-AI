@@ -70,14 +70,6 @@ Try these prompts to see different agents in action:
 
 ---
 
-## 👤 Author
-
-**Harshit Sharma**  
-*Data Analyst & Generative AI Engineer*
-* [LinkedIn](https://linkedin.com/in/harshit-sharma-8b2906386)
-* [GitHub](https://github.com/harshitsharma200377-spec)
-Runtime folders such as `data/` and `faiss_db/` are created by the app and should not be committed.
-
 ## Installation
 
 ### 1. Clone the repository
@@ -132,16 +124,6 @@ Then open:
 
 ```text
 http://localhost:8501
-```
-
-## Example Prompts
-
-```text
-Summarize this document.
-What are the key findings in chapter 3?
-Compare the conclusions of both PDFs.
-Who is the author, and what is the main argument?
-Create a medium difficulty quiz from this document.
 ```
 
 ## Notes
