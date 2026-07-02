@@ -53,7 +53,19 @@ st.markdown("""
         background-color: #0E1117;
     }
 
-    #MainMenu, footer, header {visibility: hidden;}
+    #MainMenu, footer, [data-testid="stHeaderActionElements"] {
+        visibility: hidden;
+    }
+
+    header {
+        background-color: transparent !important;
+    }
+
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stHeaderCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        visibility: visible !important;
+    }
 
     /* ============================================================
        SIDEBAR: this was the root cause of the white/invisible UI.
