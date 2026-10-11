@@ -16,11 +16,10 @@ def _get_api_key() -> str:
         return os.getenv("GROQ_API_KEY", "")
 
 
-def create_rag_chain(vectorstore, model_name="llama-3.1-8b-instant"):
+def create_rag_chain(vectorstore, model_name="llama-3.3-70b-versatile"):
     """
     Creates the Groq LLM and document retriever.
     """
-
     llm = ChatGroq(
         api_key=_get_api_key(),
         model_name=model_name,
@@ -39,7 +38,6 @@ def ask_question(llm, retriever, query, chat_history=None):
     Retrieves relevant document chunks and generates an answer.
     Supports optional chat_history for conversational follow-ups.
     """
-
     docs = retriever.invoke(query)
 
     if not docs:
@@ -47,14 +45,12 @@ def ask_question(llm, retriever, query, chat_history=None):
 
     context = "\n\n".join([doc.page_content for doc in docs])
 
-    # Get unique source file names
     sources = set()
     for doc in docs:
         source = doc.metadata.get("source", "Unknown Document")
         source = os.path.basename(source)
         sources.add(source)
 
-    # Build chat history text for context-aware answers
     history_text = ""
     if chat_history:
         history_text = "\n".join(
@@ -67,7 +63,6 @@ def ask_question(llm, retriever, query, chat_history=None):
 You are **DocPilot-AI**, an Intelligent AI Research Assistant.
 
 Your responsibilities:
-
 - Answer ONLY using the provided document context.
 - Never invent facts.
 - If the answer is missing, clearly say:
