@@ -682,9 +682,9 @@ with st.sidebar:
     selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
-            "openai/gpt-oss-20b",
-            "llama-3.3-70b-versatile",
-            "mixtral-8x7b-32768"
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "mixtral-8x7b-32768",
         ],
         index=0,
         help="Select the LLM model to power all agents."
