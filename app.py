@@ -388,15 +388,13 @@ with st.sidebar:
 
     st.divider()
 
-    # Active, stable Groq models list
+    # Only active, supported Groq models
     st.markdown("#### LLM Model Selector")
     selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
             "llama-3.3-70b-versatile",
-            "llama3-70b-8192",
-            "llama3-8b-8192",
-            "gemma2-9b-it",
+            "llama-3.1-8b-instant",
             "mixtral-8x7b-32768"
         ],
         index=0,
@@ -591,7 +589,7 @@ if user_question:
     else:
         chat_history = _get_recent_chat_history()
 
-        # Always initialize clean instance of ChatGroq with selected_model
+        # Always initialize fresh instance of ChatGroq with selected_model
         active_llm = ChatGroq(
             api_key=api_key,
             model_name=selected_model,
@@ -599,7 +597,7 @@ if user_question:
         )
         st.session_state.llm = active_llm
 
-        # Direct intent mapping fallback for single-word queries
+        # Fast direct intent detection for keywords
         lower_q = user_question.lower().strip()
         if "summarize" in lower_q or "summary" in lower_q:
             intent = "summarize"
@@ -662,7 +660,7 @@ if user_question:
                     reply = format_retrieve_response(raw_reply)
 
         except Exception as e:
-            reply = f"⚠️ Groq API Error with `{selected_model}`: {str(e)}\n\n*Tip: Try choosing another model from the left sidebar selector (e.g. `llama3-70b-8192` or `llama3-8b-8192`).*"
+            reply = f"⚠️ Groq API Error with `{selected_model}`: {str(e)}\n\n*Tip: Try choosing another model from the left sidebar selector.*"
 
         if st.session_state.memory and hasattr(st.session_state.memory, "add_exchange"):
             st.session_state.memory.add_exchange(user_question, reply)
