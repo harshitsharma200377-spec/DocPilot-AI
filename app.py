@@ -2,7 +2,6 @@
 DocPilot-AI Streamlit entrypoint.
 
 This module wires the Streamlit UI to the multi-agent backend:
-
     User -> Planner Agent (LLM intent classification)
               -> Retrieval Agent   (retrieve / explain / search)
               -> Summarizer Agent  (summarize)
@@ -12,6 +11,7 @@ This module wires the Streamlit UI to the multi-agent backend:
 
 import os
 import streamlit as st
+from langchain_groq import ChatGroq
 
 from utils.loader import load_documents
 from utils.splitter import split_documents
@@ -42,46 +42,37 @@ st.set_page_config(
 # =====================================
 st.markdown("""
 <style>
-
-    /* ---------- Global ---------- */
+    /* Global */
     .stApp {
         background-color: #0E1117;
     }
-
     #MainMenu, footer, [data-testid="stHeaderActionElements"] {
         visibility: hidden;
     }
-
     header {
         background-color: transparent !important;
     }
-
     [data-testid="stSidebarCollapseButton"],
     [data-testid="stHeaderCollapsedControl"],
     [data-testid="collapsedControl"] {
         visibility: visible !important;
     }
-
-    /* ---------- Sidebar ---------- */
+    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0B0E14 !important;
         border-right: 1px solid #1F2530;
     }
-
     [data-testid="stSidebar"] > div:first-child {
         background-color: #0B0E14 !important;
     }
-
     [data-testid="stSidebar"] * {
         color: #E5E7EB;
     }
-
     [data-testid="stSidebar"] .stCaption,
     [data-testid="stSidebar"] small {
         color: #9CA3AF !important;
     }
-
-    /* ---------- Sidebar Buttons ---------- */
+    /* Buttons */
     [data-testid="stSidebar"] .stButton > button {
         background: linear-gradient(145deg, #1A2029, #161B22) !important;
         color: #F1F3F5 !important;
@@ -89,75 +80,61 @@ st.markdown("""
         border-radius: 10px !important;
         transition: all 0.2s ease;
     }
-
     [data-testid="stSidebar"] .stButton > button:hover {
         border-color: #8B5CF6 !important;
         box-shadow: 0 0 10px rgba(139, 92, 246, 0.35);
         color: #FFFFFF !important;
     }
-
-    /* ---------- File Uploader Dropzone ---------- */
+    /* Dropzone */
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
         background: #161B22 !important;
         border: 1px dashed #2E3543 !important;
         border-radius: 12px !important;
     }
-
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
         color: #B4BAC4 !important;
     }
-
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
         background: #1A2029 !important;
         color: #F1F3F5 !important;
         border: 1px solid #2E3543 !important;
     }
-
-    /* Uploaded-file chip */
     [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
         background: #161B22 !important;
         border-radius: 8px !important;
         color: #E5E7EB !important;
     }
-
-    /* ---------- Alerts ---------- */
+    /* Alerts */
     [data-testid="stSidebar"] [data-testid="stAlert"],
     .stApp [data-testid="stAlert"] {
         background: #161B22 !important;
         border: 1px solid #262C36 !important;
         border-radius: 10px !important;
     }
-
     [data-testid="stSidebar"] [data-testid="stAlert"] p,
     .stApp [data-testid="stAlert"] p {
         color: #F1F3F5 !important;
     }
-
     [data-testid="stSidebar"] div[data-baseweb="notification"][kind="success"],
     [data-testid="stSidebar"] .stSuccess {
         border-left: 3px solid #22C55E !important;
     }
-
     [data-testid="stSidebar"] .stWarning {
         border-left: 3px solid #F59E0B !important;
     }
-
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background: #161B22 !important;
         border: 1px solid #262C36 !important;
         border-radius: 10px !important;
     }
-
     [data-testid="stSidebar"] [data-testid="stExpander"] summary {
         color: #E5E7EB !important;
         background: #161B22 !important;
     }
-
     [data-testid="stSidebar"] hr {
         border-color: #262C36 !important;
     }
-
-    /* ---------- Hero ---------- */
+    /* Hero */
     .hero-title {
         font-size: 2.6rem;
         font-weight: 800;
@@ -166,14 +143,12 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 0.2rem;
     }
-
     .hero-subtitle {
         font-size: 1.05rem;
         color: #B4BAC4;
         margin-bottom: 1.4rem;
     }
-
-    /* ---------- Feature Cards ---------- */
+    /* Feature Cards */
     .feature-card {
         background: linear-gradient(145deg, #161B22, #1A2029);
         border: 1px solid #262C36;
@@ -181,20 +156,16 @@ st.markdown("""
         padding: 1rem 1.1rem;
         height: 100%;
     }
-
     .feature-card h4 {
         margin: 0 0 0.3rem 0;
         color: #E5E7EB;
         font-size: 1rem;
     }
-
     .feature-card p {
         margin: 0;
         color: #B4BAC4;
         font-size: 0.85rem;
     }
-
-    /* ---------- Sidebar Branding ---------- */
     .sidebar-brand {
         font-size: 1.5rem;
         font-weight: 800;
@@ -203,15 +174,12 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 0;
     }
-
     .sidebar-tag {
         color: #6B7280 !important;
         font-size: 0.78rem;
         margin-top: -6px;
         margin-bottom: 1rem;
     }
-
-    /* ---------- KB Stats ---------- */
     .kb-stat-box {
         background: #161B22;
         border: 1px solid #262C36;
@@ -219,21 +187,17 @@ st.markdown("""
         padding: 0.6rem 0.8rem;
         text-align: center;
     }
-
     .kb-stat-value {
         font-size: 1.3rem;
         font-weight: 700;
         color: #22D3EE !important;
     }
-
     .kb-stat-label {
         font-size: 0.72rem;
         color: #9CA3AF !important;
         text-transform: uppercase;
         letter-spacing: 0.03em;
     }
-
-    /* ---------- Agent Badges & Status ---------- */
     .agent-pill {
         display: flex;
         align-items: center;
@@ -245,24 +209,20 @@ st.markdown("""
         margin-bottom: 6px;
         font-size: 0.85rem;
     }
-
     .agent-pill.active {
         border-color: #8B5CF6;
         background: rgba(139, 92, 246, 0.1);
     }
-
     .agent-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
         background-color: #6B7280;
     }
-
     .agent-pill.active .agent-dot {
         background-color: #22C55E;
         box-shadow: 0 0 6px #22C55E;
     }
-
     .agent-badge {
         display: inline-block;
         padding: 2px 8px;
@@ -273,25 +233,21 @@ st.markdown("""
         font-size: 0.75rem;
         margin-bottom: 8px;
     }
-
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================
-# Create Required Folders
+# Directories & Credentials
 # =====================================
 os.makedirs("data", exist_ok=True)
 os.makedirs("faiss_db", exist_ok=True)
 
-# =====================================
-# API Key Verification
-# =====================================
 api_key = _get_api_key()
 if not api_key:
     st.sidebar.error("⚠️ `GROQ_API_KEY` is not found. Please set it in your `.env` file or Streamlit secrets.")
 
 # =====================================
-# Session State
+# Session State Initialization
 # =====================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -346,7 +302,7 @@ INTENT_TO_HANDLER = {
 }
 
 # =====================================
-# Response Formatting Helpers
+# Formatters
 # =====================================
 def _get_recent_chat_history(max_turns: int = 6):
     history = [
@@ -360,53 +316,26 @@ def _get_recent_chat_history(max_turns: int = 6):
 def format_retrieve_response(data) -> str:
     if isinstance(data, str):
         return data
-
     if not isinstance(data, dict):
         return str(data)
-
     parts = []
     answer = data.get("answer", "").strip()
     if answer:
         parts.append(answer)
-
     key_points = data.get("key_points")
     if key_points:
-        parts.append("**Key Points:**")
-        parts.append("\n".join(f"- {kp}" for kp in key_points))
-
+        parts.append("**Key Points:**\n" + "\n".join(f"- {kp}" for kp in key_points))
     confidence = data.get("confidence")
     if confidence:
         parts.append(f"**Confidence:** {confidence}")
-
-    sources = data.get("sources")
-    if sources:
-        lines = ["**Sources:**"]
-        for src in sources:
-            doc_name = src.get("document", "Unknown document")
-            chunk_count = src.get("chunk_count")
-            pages = src.get("pages")
-
-            line = f"- **{doc_name}**"
-            details = []
-            if pages:
-                details.append(f"pages: {', '.join(str(p) for p in pages)}")
-            if chunk_count is not None:
-                details.append(f"{chunk_count} chunk(s) used")
-            if details:
-                line += f" _({'; '.join(details)})_"
-            lines.append(line)
-        parts.append("\n".join(lines))
-
     return "\n\n".join(parts) if parts else "I couldn't find an answer in the documents."
 
 
 def format_summarize_response(data) -> str:
     if isinstance(data, str):
         return data
-
     if not isinstance(data, dict):
         return str(data)
-
     sections = [
         ("Executive Summary", data.get("executive_summary")),
         ("Key Findings", data.get("key_findings")),
@@ -414,7 +343,6 @@ def format_summarize_response(data) -> str:
         ("Action Items", data.get("action_items")),
         ("Conclusion", data.get("conclusion")),
     ]
-
     parts = []
     for title, content in sections:
         if not content:
@@ -424,147 +352,61 @@ def format_summarize_response(data) -> str:
             parts.append("\n".join(f"- {item}" for item in content))
         else:
             parts.append(str(content))
-
     return "\n\n".join(parts) if parts else "No summary could be generated."
 
 
 def format_compare_response(data) -> str:
     if isinstance(data, str):
         return data
-
     if not isinstance(data, dict):
         return str(data)
-
     if data.get("single_document"):
-        return data.get(
-            "message",
-            "Only one document is indexed, so a cross-document comparison "
-            "isn't possible. Upload at least two PDFs to compare them."
-        )
-
-    parts = []
-    table = data.get("comparison_table")
-    if table:
-        if isinstance(table, str):
-            parts.append("**Comparison Table**\n\n" + table)
-        elif isinstance(table, list) and table:
-            headers = list(table[0].keys())
-            header_row = "| " + " | ".join(headers) + " |"
-            divider_row = "| " + " | ".join("---" for _ in headers) + " |"
-            body_rows = [
-                "| " + " | ".join(str(row.get(h, "")) for h in headers) + " |"
-                for row in table
-            ]
-            parts.append("**Comparison Table**\n\n" + "\n".join([header_row, divider_row, *body_rows]))
-
-    list_sections = [
-        ("Similarities", data.get("similarities")),
-        ("Differences", data.get("differences")),
-        ("Strengths", data.get("strengths")),
-        ("Weaknesses", data.get("weaknesses")),
-        ("Recommendations", data.get("recommendations")),
-    ]
-
-    for title, content in list_sections:
-        if not content:
-            continue
-        parts.append(f"**{title}**")
-        if isinstance(content, list):
-            parts.append("\n".join(f"- {item}" for item in content))
-        else:
-            parts.append(str(content))
-
-    return "\n\n".join(parts) if parts else "No comparison could be generated."
+        return data.get("message", "Please upload at least two PDFs to compare.")
+    return str(data.get("comparison", data))
 
 
 def format_quiz_response(data) -> str:
     if isinstance(data, str):
         return data
-
-    if not isinstance(data, dict):
-        return str(data)
-
-    parts = []
-    difficulty = data.get("difficulty")
-    if difficulty:
-        parts.append(f"**Difficulty:** {difficulty}")
-
-    mcqs = data.get("mcqs")
-    if mcqs:
-        lines = ["**Multiple Choice Questions**"]
-        for i, q in enumerate(mcqs, start=1):
-            lines.append(f"\n{i}. {q.get('question', '')}")
-            for opt_letter, opt_text in q.get("options", {}).items():
-                lines.append(f"   - {opt_letter}) {opt_text}")
-            answer = q.get("answer")
-            if answer:
-                lines.append(f"   - **Answer:** {answer}")
-        parts.append("\n".join(lines))
-
-    true_false = data.get("true_false")
-    if true_false:
-        lines = ["**True / False**"]
-        for i, q in enumerate(true_false, start=1):
-            lines.append(f"{i}. {q.get('statement', '')}")
-            answer = q.get("answer")
-            if answer is not None:
-                lines.append(f"   - **Answer:** {answer}")
-        parts.append("\n".join(lines))
-
-    short_answer = data.get("short_answer")
-    if short_answer:
-        lines = ["**Short Answer**"]
-        for i, q in enumerate(short_answer, start=1):
-            lines.append(f"{i}. {q.get('question', '')}")
-            answer = q.get("answer")
-            if answer:
-                lines.append(f"   - **Suggested Answer:** {answer}")
-        parts.append("\n".join(lines))
-
-    return "\n\n".join(parts) if parts else "No quiz questions could be generated."
-
+    return str(data)
 
 # =====================================
-# Sidebar
+# Sidebar UI
 # =====================================
 with st.sidebar:
-
     st.markdown('<p class="sidebar-brand">DocPilot-AI</p>', unsafe_allow_html=True)
     st.markdown('<p class="sidebar-tag">Multi-Agent Document Research Assistant</p>', unsafe_allow_html=True)
 
     st.markdown("#### Upload Documents")
-
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
         type=["pdf"],
         accept_multiple_files=True,
         label_visibility="collapsed"
     )
-
     process_button = st.button("Process Documents", use_container_width=True)
 
     st.divider()
 
-    # ---------- Model Selector ----------
+    # Active, stable Groq models list
     st.markdown("#### LLM Model Selector")
     selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
             "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            "llama3-70b-8192",
+            "llama3-8b-8192",
+            "gemma2-9b-it",
             "mixtral-8x7b-32768"
         ],
         index=0,
-        help="Select the Groq LLM model to power all agents."
+        help="Select an active Groq LLM model to power all agents."
     )
 
     st.divider()
 
-    # ---------- Knowledge Base Stats ----------
     st.markdown("#### Knowledge Base")
-
     stat_col1, stat_col2 = st.columns(2)
-
     with stat_col1:
         st.markdown(f"""
         <div class="kb-stat-box">
@@ -582,7 +424,6 @@ with st.sidebar:
         """, unsafe_allow_html=True)
 
     st.markdown("")
-
     if st.session_state.rag_ready:
         st.success("Knowledge base ready")
     else:
@@ -595,15 +436,12 @@ with st.sidebar:
 
     st.divider()
 
-    # ---------- Quiz Settings ----------
     st.markdown("#### Quiz Settings")
-
     st.session_state.quiz_difficulty = st.selectbox(
         "Difficulty",
         options=["Easy", "Medium", "Hard"],
         index=["Easy", "Medium", "Hard"].index(st.session_state.quiz_difficulty),
     )
-
     st.session_state.quiz_num_questions = st.slider(
         "Questions per quiz",
         min_value=3,
@@ -611,13 +449,9 @@ with st.sidebar:
         value=st.session_state.quiz_num_questions,
     )
 
-    st.caption("Ask things like *\"quiz me on this document\"* to trigger the Quiz Agent.")
-
     st.divider()
 
-    # ---------- Agent Status Panel ----------
     st.markdown("#### Agent Status")
-
     for key in ["retrieve", "summarize", "compare", "quiz"]:
         meta = AGENT_META[key]
         active_class = "active" if st.session_state.last_agent == key else ""
@@ -628,17 +462,16 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # ---------- Export Conversation ----------
+    st.divider()
+
     if st.session_state.messages:
-        st.markdown("#### Export Chat")
-        
         export_text = "# DocPilot-AI Chat History\n\n"
         for msg in st.session_state.messages:
             role = msg["role"].upper()
             content = msg["content"]
             agent = f" (Agent: {msg.get('agent')})" if msg.get("agent") else ""
             export_text += f"### **{role}**{agent}\n{content}\n\n---\n\n"
-            
+
         st.download_button(
             label="Download Chat (Markdown)",
             data=export_text,
@@ -646,8 +479,6 @@ with st.sidebar:
             mime="text/markdown",
             use_container_width=True
         )
-
-    st.divider()
 
     if st.button("Clear Chat", use_container_width=True):
         st.session_state.messages = []
@@ -657,7 +488,7 @@ with st.sidebar:
         st.rerun()
 
 # =====================================
-# Main Page Hero
+# Main Header
 # =====================================
 st.markdown('<p class="hero-title">DocPilot-AI</p>', unsafe_allow_html=True)
 st.markdown(
@@ -667,52 +498,26 @@ st.markdown(
 )
 
 feat_col1, feat_col2, feat_col3, feat_col4 = st.columns(4)
-
 with feat_col1:
-    st.markdown("""
-    <div class="feature-card">
-        <h4>Retrieve</h4>
-        <p>Grounded, semantic Q&A over your documents.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown('<div class="feature-card"><h4>Retrieve</h4><p>Grounded semantic Q&A.</p></div>', unsafe_allow_html=True)
 with feat_col2:
-    st.markdown("""
-    <div class="feature-card">
-        <h4>Summarize</h4>
-        <p>Structured, executive-style document summaries.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown('<div class="feature-card"><h4>Summarize</h4><p>Structured document summaries.</p></div>', unsafe_allow_html=True)
 with feat_col3:
-    st.markdown("""
-    <div class="feature-card">
-        <h4>Compare</h4>
-        <p>Cross-document analysis and comparison tables.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown('<div class="feature-card"><h4>Compare</h4><p>Cross-document comparisons.</p></div>', unsafe_allow_html=True)
 with feat_col4:
-    st.markdown("""
-    <div class="feature-card">
-        <h4>Quiz</h4>
-        <p>Auto-generated MCQs, true/false, and short answer questions.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="feature-card"><h4>Quiz</h4><p>Auto-generated MCQs & questions.</p></div>', unsafe_allow_html=True)
 
 st.markdown("")
 
 # =====================================
-# Process Documents
+# Document Processing
 # =====================================
 if process_button:
-
     if not api_key:
         st.error("Please configure your `GROQ_API_KEY` before processing documents.")
     elif not uploaded_files:
         st.warning("Please upload at least one PDF.")
     else:
-        # Clear out previous documents from data/ to prevent index mixing
         for filename in os.listdir("data"):
             file_to_remove = os.path.join("data", filename)
             if os.path.isfile(file_to_remove):
@@ -725,23 +530,16 @@ if process_button:
 
         with st.spinner("Extracting text, chunking, and building the FAISS index..."):
             docs = load_documents()
-
-            # Prevent empty text extraction crash (scanned PDFs or blank files)
             has_text = any(doc.page_content.strip() for doc in docs) if docs else False
+
             if not docs or not has_text:
-                st.error(
-                    "⚠️ No readable text found in the uploaded PDF. "
-                    "This usually happens with scanned image-only PDFs. "
-                    "Please upload a PDF containing selectable text."
-                )
+                st.error("⚠️ No readable text found. Please upload a PDF with selectable text.")
             else:
                 chunks = split_documents(docs)
-
                 if not chunks:
                     st.error("⚠️ Failed to produce chunks from the uploaded document text.")
                 else:
                     db = create_vectorstore(chunks)
-
                     llm, retriever = create_rag_chain(db, model_name=selected_model)
 
                     st.session_state.llm = llm
@@ -757,7 +555,7 @@ if process_button:
                     st.rerun()
 
 # =====================================
-# Chat History
+# Chat Messages
 # =====================================
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -771,12 +569,11 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # =====================================
-# Chat Input
+# Chat Handling
 # =====================================
 user_question = st.chat_input("Ask DocPilot anything about your uploaded documents...")
 
 if user_question:
-
     st.session_state.messages.append({
         "role": "user",
         "content": user_question
@@ -794,16 +591,29 @@ if user_question:
     else:
         chat_history = _get_recent_chat_history()
 
-        from langchain_groq import ChatGroq
-        st.session_state.llm = ChatGroq(
+        # Always initialize clean instance of ChatGroq with selected_model
+        active_llm = ChatGroq(
             api_key=api_key,
             model_name=selected_model,
             temperature=0
         )
-        planner = PlannerAgent(model_name=selected_model)
+        st.session_state.llm = active_llm
 
-        with st.spinner("Planner is reasoning about the right agent..."):
-            intent = planner.plan(user_question, chat_history=chat_history)
+        # Direct intent mapping fallback for single-word queries
+        lower_q = user_question.lower().strip()
+        if "summarize" in lower_q or "summary" in lower_q:
+            intent = "summarize"
+        elif "compare" in lower_q or "comparison" in lower_q:
+            intent = "compare"
+        elif "quiz" in lower_q or "test me" in lower_q:
+            intent = "quiz"
+        else:
+            with st.spinner("Planner is reasoning about the right agent..."):
+                try:
+                    planner = PlannerAgent(model_name=selected_model)
+                    intent = planner.plan(user_question, chat_history=chat_history)
+                except Exception:
+                    intent = "retrieve"
 
         task = INTENT_TO_HANDLER.get(intent, "retrieve")
         agent_used = intent if intent in AGENT_META else "retrieve"
@@ -811,55 +621,48 @@ if user_question:
 
         agent_label = AGENT_META.get(agent_used, AGENT_META["retrieve"])["label"]
 
-        with st.spinner(f"{agent_label} is working on your request..."):
-
-            if task == "retrieve":
-                retrieval_agent = RetrievalAgent()
-                raw_reply = retrieval_agent.retrieve(
-                    st.session_state.llm,
-                    st.session_state.retriever,
-                    user_question,
-                    chat_history=chat_history,
-                )
-                reply = format_retrieve_response(raw_reply)
-
-            elif task == "summarize":
-                raw_reply = summarizer.summarize(
-                    st.session_state.llm,
-                    st.session_state.retriever,
-                    doc_names=st.session_state.doc_names,
-                )
-                reply = format_summarize_response(raw_reply)
-
-            elif task == "compare":
-                raw_reply = comparison.compare(
-                    st.session_state.llm,
-                    st.session_state.retriever,
-                    doc_names=st.session_state.doc_names,
-                )
-                reply = format_compare_response(raw_reply)
-
-            elif task == "quiz":
-                if quiz_agent is None:
-                    reply = "Quiz Agent is not available yet. Add `agents/quiz_agent.py` to enable it."
-                else:
-                    raw_reply = quiz_agent.generate_quiz(
+        try:
+            with st.spinner(f"{agent_label} is working on your request..."):
+                if task == "summarize":
+                    raw_reply = summarizer.summarize(
                         st.session_state.llm,
                         st.session_state.retriever,
-                        difficulty=st.session_state.quiz_difficulty,
-                        num_questions=st.session_state.quiz_num_questions,
+                        doc_names=st.session_state.doc_names,
                     )
-                    reply = format_quiz_response(raw_reply)
+                    reply = format_summarize_response(raw_reply)
 
-            else:
-                retrieval_agent = RetrievalAgent()
-                raw_reply = retrieval_agent.retrieve(
-                    st.session_state.llm,
-                    st.session_state.retriever,
-                    user_question,
-                    chat_history=chat_history,
-                )
-                reply = format_retrieve_response(raw_reply)
+                elif task == "compare":
+                    raw_reply = comparison.compare(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        doc_names=st.session_state.doc_names,
+                    )
+                    reply = format_compare_response(raw_reply)
+
+                elif task == "quiz":
+                    if quiz_agent is None:
+                        reply = "Quiz Agent is not available yet."
+                    else:
+                        raw_reply = quiz_agent.generate_quiz(
+                            st.session_state.llm,
+                            st.session_state.retriever,
+                            difficulty=st.session_state.quiz_difficulty,
+                            num_questions=st.session_state.quiz_num_questions,
+                        )
+                        reply = format_quiz_response(raw_reply)
+
+                else:
+                    retrieval_agent = RetrievalAgent()
+                    raw_reply = retrieval_agent.retrieve(
+                        st.session_state.llm,
+                        st.session_state.retriever,
+                        user_question,
+                        chat_history=chat_history,
+                    )
+                    reply = format_retrieve_response(raw_reply)
+
+        except Exception as e:
+            reply = f"⚠️ Groq API Error with `{selected_model}`: {str(e)}\n\n*Tip: Try choosing another model from the left sidebar selector (e.g. `llama3-70b-8192` or `llama3-8b-8192`).*"
 
         if st.session_state.memory and hasattr(st.session_state.memory, "add_exchange"):
             st.session_state.memory.add_exchange(user_question, reply)
