@@ -11,7 +11,6 @@ This module wires the Streamlit UI to the multi-agent backend:
 """
 
 import os
-import shutil
 import streamlit as st
 
 from utils.loader import load_documents
@@ -114,6 +113,7 @@ st.markdown("""
         border: 1px solid #2E3543 !important;
     }
 
+    /* Uploaded-file chip */
     [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
         background: #161B22 !important;
         border-radius: 8px !important;
@@ -233,7 +233,7 @@ st.markdown("""
         letter-spacing: 0.03em;
     }
 
-    /* ---------- Badges & Status ---------- */
+    /* ---------- Agent Badges & Status ---------- */
     .agent-pill {
         display: flex;
         align-items: center;
@@ -712,7 +712,7 @@ if process_button:
     elif not uploaded_files:
         st.warning("Please upload at least one PDF.")
     else:
-        # Clear out old documents from data/ to prevent index pollution
+        # Clear out previous documents from data/ to prevent index mixing
         for filename in os.listdir("data"):
             file_to_remove = os.path.join("data", filename)
             if os.path.isfile(file_to_remove):
@@ -725,22 +725,36 @@ if process_button:
 
         with st.spinner("Extracting text, chunking, and building the FAISS index..."):
             docs = load_documents()
-            chunks = split_documents(docs)
-            db = create_vectorstore(chunks)
 
-            llm, retriever = create_rag_chain(db, model_name=selected_model)
+            # Prevent empty text extraction crash (scanned PDFs or blank files)
+            has_text = any(doc.page_content.strip() for doc in docs) if docs else False
+            if not docs or not has_text:
+                st.error(
+                    "⚠️ No readable text found in the uploaded PDF. "
+                    "This usually happens with scanned image-only PDFs. "
+                    "Please upload a PDF containing selectable text."
+                )
+            else:
+                chunks = split_documents(docs)
 
-            st.session_state.llm = llm
-            st.session_state.retriever = retriever
-            st.session_state.rag_ready = True
-            st.session_state.doc_names = [f.name for f in uploaded_files]
-            st.session_state.chunk_count = len(chunks)
+                if not chunks:
+                    st.error("⚠️ Failed to produce chunks from the uploaded document text.")
+                else:
+                    db = create_vectorstore(chunks)
 
-            if ConversationMemory:
-                st.session_state.memory = ConversationMemory()
+                    llm, retriever = create_rag_chain(db, model_name=selected_model)
 
-        st.success(f"Knowledge base built: {len(chunks)} chunks indexed from {len(uploaded_files)} document(s).")
-        st.rerun()
+                    st.session_state.llm = llm
+                    st.session_state.retriever = retriever
+                    st.session_state.rag_ready = True
+                    st.session_state.doc_names = [f.name for f in uploaded_files]
+                    st.session_state.chunk_count = len(chunks)
+
+                    if ConversationMemory:
+                        st.session_state.memory = ConversationMemory()
+
+                    st.success(f"Knowledge base built: {len(chunks)} chunks indexed from {len(uploaded_files)} document(s).")
+                    st.rerun()
 
 # =====================================
 # Chat History
@@ -780,7 +794,6 @@ if user_question:
     else:
         chat_history = _get_recent_chat_history()
 
-        # Re-initialize LLM and Planner dynamically based on model selector
         from langchain_groq import ChatGroq
         st.session_state.llm = ChatGroq(
             api_key=api_key,
