@@ -390,13 +390,16 @@ with st.sidebar:
 
     # Only active, supported Groq models
     st.markdown("#### LLM Model Selector")
-    selected_model = st.selectbox(
+        selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
             "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768"
+            "qwen-2.5-32b",
+            "deepseek-r1-distill-llama-70b"
         ],
+        index=0,
+        help="Select an active Groq LLM model to power all agents."
+    ),
         index=0,
         help="Select an active Groq LLM model to power all agents."
     )
