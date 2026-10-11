@@ -11,7 +11,7 @@ class PlannerAgent:
     the appropriate downstream agent: retrieve, summarize, compare, quiz.
     """
 
-    def __init__(self, model_name="llama-3.1-8b-instant"):
+    def __init__(self, model_name="llama-3.3-70b-versatile"):
         try:
             api_key = st.secrets["GROQ_API_KEY"]
         except Exception:
@@ -71,13 +71,16 @@ User Request:
 {query}
 """
 
-        decision = self.llm.invoke(prompt).content.lower().strip()
+        try:
+            decision = self.llm.invoke(prompt).content.lower().strip()
 
-        if "summarize" in decision:
-            return "summarize"
-        elif "compare" in decision:
-            return "compare"
-        elif "quiz" in decision:
-            return "quiz"
-
-        return "retrieve"
+            if "summarize" in decision:
+                return "summarize"
+            elif "compare" in decision:
+                return "compare"
+            elif "quiz" in decision:
+                return "quiz"
+            return "retrieve"
+        except Exception:
+            # Fallback safely to retrieve if LLM call fails
+            return "retrieve"
