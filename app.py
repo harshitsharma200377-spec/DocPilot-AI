@@ -388,18 +388,15 @@ with st.sidebar:
 
     st.divider()
 
-    # Only active, supported Groq models
+    # Active production Groq models only
     st.markdown("#### LLM Model Selector")
-        selected_model = st.selectbox(
+    selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
             "llama-3.3-70b-versatile",
             "qwen-2.5-32b",
             "deepseek-r1-distill-llama-70b"
         ],
-        index=0,
-        help="Select an active Groq LLM model to power all agents."
-    ),
         index=0,
         help="Select an active Groq LLM model to power all agents."
     )
@@ -600,7 +597,7 @@ if user_question:
         )
         st.session_state.llm = active_llm
 
-        # Fast direct intent detection for keywords
+        # Fast direct intent detection
         lower_q = user_question.lower().strip()
         if "summarize" in lower_q or "summary" in lower_q:
             intent = "summarize"
