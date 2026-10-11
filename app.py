@@ -12,6 +12,7 @@ This module wires the Streamlit UI to the multi-agent backend:
 import os
 import streamlit as st
 from langchain_groq import ChatGroq
+from groq import Groq
 
 from utils.loader import load_documents
 from utils.splitter import split_documents
@@ -247,6 +248,30 @@ if not api_key:
     st.sidebar.error("⚠️ `GROQ_API_KEY` is not found. Please set it in your `.env` file or Streamlit secrets.")
 
 # =====================================
+# Dynamic Live Model Fetcher
+# =====================================
+@st.cache_data(ttl=3600)
+def get_available_groq_models(key: str):
+    """Fetch active chat models directly from Groq API to avoid decommission errors."""
+    fallback_models = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.8-27b",
+    ]
+    if not key:
+        return fallback_models
+    try:
+        client = Groq(api_key=key)
+        model_list = client.models.list()
+        chat_models = [
+            m.id for m in model_list.data 
+            if not m.id.startswith("whisper") and "safeguard" not in m.id
+        ]
+        return chat_models if chat_models else fallback_models
+    except Exception:
+        return fallback_models
+
+# =====================================
 # Session State Initialization
 # =====================================
 if "messages" not in st.session_state:
@@ -388,17 +413,13 @@ with st.sidebar:
 
     st.divider()
 
-    # Active production Groq models only
     st.markdown("#### LLM Model Selector")
+    live_models = get_available_groq_models(api_key)
     selected_model = st.selectbox(
         "Choose Groq LLM",
-        options=[
-            "llama-3.3-70b-versatile",
-            "qwen-2.5-32b",
-            "deepseek-r1-distill-llama-70b"
-        ],
+        options=live_models,
         index=0,
-        help="Select an active Groq LLM model to power all agents."
+        help="Real-time verified active models for your Groq API key."
     )
 
     st.divider()
@@ -589,7 +610,6 @@ if user_question:
     else:
         chat_history = _get_recent_chat_history()
 
-        # Always initialize fresh instance of ChatGroq with selected_model
         active_llm = ChatGroq(
             api_key=api_key,
             model_name=selected_model,
@@ -597,7 +617,6 @@ if user_question:
         )
         st.session_state.llm = active_llm
 
-        # Fast direct intent detection
         lower_q = user_question.lower().strip()
         if "summarize" in lower_q or "summary" in lower_q:
             intent = "summarize"
@@ -660,7 +679,7 @@ if user_question:
                     reply = format_retrieve_response(raw_reply)
 
         except Exception as e:
-            reply = f"⚠️ Groq API Error with `{selected_model}`: {str(e)}\n\n*Tip: Try choosing another model from the left sidebar selector.*"
+            reply = f"⚠️ Groq API Error with `{selected_model}`: {str(e)}\n\n*Tip: Try selecting another model from the left sidebar selector.*"
 
         if st.session_state.memory and hasattr(st.session_state.memory, "add_exchange"):
             st.session_state.memory.add_exchange(user_question, reply)
