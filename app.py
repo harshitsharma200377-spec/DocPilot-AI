@@ -8,20 +8,16 @@ This module wires the Streamlit UI to the multi-agent backend:
               -> Summarizer Agent  (summarize)
               -> Comparison Agent  (compare)
               -> Quiz Agent        (quiz)
-
-The UI, theme, and layout are unchanged from the original app.py.
-Only the orchestration logic and response rendering were updated to
-support the new structured (dict-based) agent outputs and real
-multi-agent routing.
 """
 
 import os
+import shutil
 import streamlit as st
 
 from utils.loader import load_documents
 from utils.splitter import split_documents
 from utils.vectorstore import create_vectorstore
-from utils.rag_chain import create_rag_chain
+from utils.rag_chain import create_rag_chain, _get_api_key
 
 from agents import (
     PlannerAgent,
@@ -67,13 +63,7 @@ st.markdown("""
         visibility: visible !important;
     }
 
-    /* ============================================================
-       SIDEBAR: this was the root cause of the white/invisible UI.
-       Streamlit's sidebar is its own DOM node (data-testid="stSidebar")
-       and does NOT inherit .stApp's background. Every rule below
-       explicitly targets the sidebar so nothing falls back to the
-       default light theme.
-       ============================================================ */
+    /* ---------- Sidebar ---------- */
     [data-testid="stSidebar"] {
         background-color: #0B0E14 !important;
         border-right: 1px solid #1F2530;
@@ -83,7 +73,6 @@ st.markdown("""
         background-color: #0B0E14 !important;
     }
 
-    /* Any plain text / labels / captions inside the sidebar */
     [data-testid="stSidebar"] * {
         color: #E5E7EB;
     }
@@ -125,14 +114,13 @@ st.markdown("""
         border: 1px solid #2E3543 !important;
     }
 
-    /* Uploaded-file chip that appears after selecting a file */
     [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
         background: #161B22 !important;
         border-radius: 8px !important;
         color: #E5E7EB !important;
     }
 
-    /* ---------- Alerts (st.success / st.warning / st.error / st.info) ---------- */
+    /* ---------- Alerts ---------- */
     [data-testid="stSidebar"] [data-testid="stAlert"],
     .stApp [data-testid="stAlert"] {
         background: #161B22 !important;
@@ -145,7 +133,6 @@ st.markdown("""
         color: #F1F3F5 !important;
     }
 
-    /* success = green accent border, warning = amber accent border */
     [data-testid="stSidebar"] div[data-baseweb="notification"][kind="success"],
     [data-testid="stSidebar"] .stSuccess {
         border-left: 3px solid #22C55E !important;
@@ -155,7 +142,6 @@ st.markdown("""
         border-left: 3px solid #F59E0B !important;
     }
 
-    /* ---------- Expander ("Indexed files") ---------- */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
         background: #161B22 !important;
         border: 1px solid #262C36 !important;
@@ -167,7 +153,6 @@ st.markdown("""
         background: #161B22 !important;
     }
 
-    /* ---------- Divider ---------- */
     [data-testid="stSidebar"] hr {
         border-color: #262C36 !important;
     }
@@ -248,134 +233,45 @@ st.markdown("""
         letter-spacing: 0.03em;
     }
 
-    /* ---------- Agent Status Panel ---------- */
+    /* ---------- Badges & Status ---------- */
     .agent-pill {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 8px;
         background: #161B22;
         border: 1px solid #262C36;
-        border-radius: 10px;
-        padding: 0.5rem 0.7rem;
-        margin-bottom: 0.45rem;
+        margin-bottom: 6px;
         font-size: 0.85rem;
-        color: #9CA3AF !important;
-        transition: all 0.2s ease;
     }
 
     .agent-pill.active {
-        border: 1px solid #8B5CF6;
-        box-shadow: 0 0 12px rgba(139, 92, 246, 0.35);
-        color: #E5E7EB !important;
-        background: linear-gradient(145deg, #1E1730, #161B22);
+        border-color: #8B5CF6;
+        background: rgba(139, 92, 246, 0.1);
     }
 
     .agent-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #4B5563;
+        background-color: #6B7280;
     }
 
     .agent-pill.active .agent-dot {
-        background: #22D3EE;
-        box-shadow: 0 0 8px #22D3EE;
+        background-color: #22C55E;
+        box-shadow: 0 0 6px #22C55E;
     }
 
-    /* ---------- Chat Agent Badge ---------- */
     .agent-badge {
         display: inline-block;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        padding: 0.15rem 0.55rem;
-        border-radius: 999px;
-        margin-bottom: 0.5rem;
+        padding: 2px 8px;
+        border-radius: 6px;
         background: rgba(139, 92, 246, 0.15);
-        color: #A78BFA;
         border: 1px solid rgba(139, 92, 246, 0.35);
-    }
-
-    /* ---------- Readability Fixes ---------- */
-    /* Streamlit's default markdown text renders too dim on dark backgrounds.
-       Force high-contrast text everywhere answers/content actually render. */
-    .stMarkdown, .stMarkdown p, .stMarkdown li,
-    [data-testid="stChatMessage"] p,
-    [data-testid="stChatMessage"] li,
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] li {
-        color: #F1F3F5 !important;
-        line-height: 1.65 !important;
-        font-size: 0.98rem !important;
-    }
-
-    [data-testid="stMarkdownContainer"] h1,
-    [data-testid="stMarkdownContainer"] h2,
-    [data-testid="stMarkdownContainer"] h3,
-    [data-testid="stMarkdownContainer"] h4 {
-        color: #FFFFFF !important;
-        margin-top: 0.9rem !important;
-        margin-bottom: 0.3rem !important;
-    }
-
-    [data-testid="stMarkdownContainer"] strong {
-        color: #FFFFFF !important;
-    }
-
-    /* Give chat bubbles a proper card surface instead of floating on bare black */
-    [data-testid="stChatMessage"] {
-        background: #161B22 !important;
-        border: 1px solid #262C36 !important;
-        border-radius: 14px !important;
-        padding: 1rem 1.1rem !important;
-        margin-bottom: 0.7rem !important;
-    }
-
-    /* Slightly distinguish the user's own messages */
-    [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-        background: #1A1F2B !important;
-        border: 1px solid #2E3543 !important;
-    }
-
-    /* ---------- Chat Input Box ---------- */
-    /* The chat input is a multi-layer widget (outer container > baseweb
-       wrapper > textarea). Each layer ships its own white background,
-       so every layer must be overridden explicitly or it falls back
-       to white-on-white like the sidebar did. */
-    [data-testid="stChatInput"] {
-        background: #161B22 !important;
-        border: 1px solid #262C36 !important;
-        border-radius: 12px !important;
-    }
-
-    [data-testid="stChatInput"] > div,
-    [data-testid="stChatInput"] [data-baseweb="textarea"],
-    [data-testid="stChatInput"] [data-baseweb="base-input"] {
-        background: #161B22 !important;
-        border: none !important;
-    }
-
-    [data-testid="stChatInput"] textarea,
-    [data-testid="stChatInputTextArea"] {
-        background: #161B22 !important;
-        color: #F1F3F5 !important;
-        caret-color: #F1F3F5 !important;
-    }
-
-    [data-testid="stChatInput"] textarea::placeholder {
-        color: #7C8493 !important;
-        opacity: 1 !important;
-    }
-
-    /* Send button */
-    [data-testid="stChatInput"] button {
-        background: #EF4444 !important;
-        border-radius: 8px !important;
-    }
-
-    [data-testid="stChatInput"] button svg {
-        fill: #FFFFFF !important;
+        color: #C4B5FD !important;
+        font-size: 0.75rem;
+        margin-bottom: 8px;
     }
 
 </style>
@@ -386,6 +282,13 @@ st.markdown("""
 # =====================================
 os.makedirs("data", exist_ok=True)
 os.makedirs("faiss_db", exist_ok=True)
+
+# =====================================
+# API Key Verification
+# =====================================
+api_key = _get_api_key()
+if not api_key:
+    st.sidebar.error("⚠️ `GROQ_API_KEY` is not found. Please set it in your `.env` file or Streamlit secrets.")
 
 # =====================================
 # Session State
@@ -420,26 +323,19 @@ if "quiz_difficulty" not in st.session_state:
 if "quiz_num_questions" not in st.session_state:
     st.session_state.quiz_num_questions = 5
 
-planner = PlannerAgent()
 summarizer = SummarizerAgent()
 comparison = ComparisonAgent()
 quiz_agent = QuizAgent() if QuizAgent else None
 
-# Metadata used purely for sidebar/status/badge rendering.
-# Keys correspond to the *planner intents*, not necessarily distinct
-# backend agents, e.g. "explain" and "search" are routed to the
-# Retrieval Agent under the hood but are surfaced with their own label
-# so the user can see what the Planner actually decided.
 AGENT_META = {
-    "retrieve":  {"label": "Retrieval Agent",   "icon": "[R]"},
-    "explain":   {"label": "Explain (Retrieval)", "icon": "[E]"},
-    "search":    {"label": "Search (Retrieval)", "icon": "[S]"},
-    "summarize": {"label": "Summarizer Agent",  "icon": "[SUM]"},
-    "compare":   {"label": "Comparison Agent",  "icon": "[CMP]"},
-    "quiz":      {"label": "Quiz Agent",        "icon": "[Q]"},
+    "retrieve":  {"label": "Retrieval Agent",     "icon": "🔍"},
+    "explain":   {"label": "Explain (Retrieval)", "icon": "💡"},
+    "search":    {"label": "Search (Retrieval)",  "icon": "🔎"},
+    "summarize": {"label": "Summarizer Agent",    "icon": "📝"},
+    "compare":   {"label": "Comparison Agent",    "icon": "⚖️"},
+    "quiz":      {"label": "Quiz Agent",          "icon": "❓"},
 }
 
-# Maps every planner intent onto the backend handler responsible for it.
 INTENT_TO_HANDLER = {
     "retrieve": "retrieve",
     "explain": "retrieve",
@@ -449,18 +345,10 @@ INTENT_TO_HANDLER = {
     "quiz": "quiz",
 }
 
-
 # =====================================
 # Response Formatting Helpers
 # =====================================
 def _get_recent_chat_history(max_turns: int = 6):
-    """
-    Build a lightweight chat history list from session messages for
-    agents that support conversational follow-ups (Planner, Retrieval).
-
-    Returns a list of {"role": ..., "content": ...} dicts, most recent
-    `max_turns` exchanges only, to keep prompts small.
-    """
     history = [
         {"role": m["role"], "content": m["content"]}
         for m in st.session_state.messages
@@ -470,7 +358,6 @@ def _get_recent_chat_history(max_turns: int = 6):
 
 
 def format_retrieve_response(data) -> str:
-    """Render a Retrieval Agent response (dict or legacy string) as markdown."""
     if isinstance(data, str):
         return data
 
@@ -478,7 +365,6 @@ def format_retrieve_response(data) -> str:
         return str(data)
 
     parts = []
-
     answer = data.get("answer", "").strip()
     if answer:
         parts.append(answer)
@@ -515,7 +401,6 @@ def format_retrieve_response(data) -> str:
 
 
 def format_summarize_response(data) -> str:
-    """Render a Summarizer Agent response (dict or legacy string) as markdown."""
     if isinstance(data, str):
         return data
 
@@ -544,7 +429,6 @@ def format_summarize_response(data) -> str:
 
 
 def format_compare_response(data) -> str:
-    """Render a Comparison Agent response (dict or legacy string) as markdown."""
     if isinstance(data, str):
         return data
 
@@ -552,19 +436,15 @@ def format_compare_response(data) -> str:
         return str(data)
 
     if data.get("single_document"):
-        note = data.get(
+        return data.get(
             "message",
             "Only one document is indexed, so a cross-document comparison "
             "isn't possible. Upload at least two PDFs to compare them."
         )
-        return note
 
     parts = []
-
     table = data.get("comparison_table")
     if table:
-        # Accept either a pre-formatted markdown table string or a list
-        # of row dicts to render as a markdown table.
         if isinstance(table, str):
             parts.append("**Comparison Table**\n\n" + table)
         elif isinstance(table, list) and table:
@@ -575,8 +455,7 @@ def format_compare_response(data) -> str:
                 "| " + " | ".join(str(row.get(h, "")) for h in headers) + " |"
                 for row in table
             ]
-            md_table = "\n".join([header_row, divider_row, *body_rows])
-            parts.append("**Comparison Table**\n\n" + md_table)
+            parts.append("**Comparison Table**\n\n" + "\n".join([header_row, divider_row, *body_rows]))
 
     list_sections = [
         ("Similarities", data.get("similarities")),
@@ -599,7 +478,6 @@ def format_compare_response(data) -> str:
 
 
 def format_quiz_response(data) -> str:
-    """Render a Quiz Agent response (dict or legacy string) as markdown."""
     if isinstance(data, str):
         return data
 
@@ -646,16 +524,6 @@ def format_quiz_response(data) -> str:
     return "\n\n".join(parts) if parts else "No quiz questions could be generated."
 
 
-FORMATTERS = {
-    "retrieve": format_retrieve_response,
-    "explain": format_retrieve_response,
-    "search": format_retrieve_response,
-    "summarize": format_summarize_response,
-    "compare": format_compare_response,
-    "quiz": format_quiz_response,
-}
-
-
 # =====================================
 # Sidebar
 # =====================================
@@ -682,12 +550,12 @@ with st.sidebar:
     selected_model = st.selectbox(
         "Choose Groq LLM",
         options=[
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "mixtral-8x7b-32768"
         ],
         index=0,
-        help="Select the LLM model to power all agents."
+        help="Select the Groq LLM model to power all agents."
     )
 
     st.divider()
@@ -764,7 +632,6 @@ with st.sidebar:
     if st.session_state.messages:
         st.markdown("#### Export Chat")
         
-        # Build markdown text of the full conversation
         export_text = "# DocPilot-AI Chat History\n\n"
         for msg in st.session_state.messages:
             role = msg["role"].upper()
@@ -840,25 +707,25 @@ st.markdown("")
 # =====================================
 if process_button:
 
-    if not uploaded_files:
-
+    if not api_key:
+        st.error("Please configure your `GROQ_API_KEY` before processing documents.")
+    elif not uploaded_files:
         st.warning("Please upload at least one PDF.")
-
     else:
+        # Clear out old documents from data/ to prevent index pollution
+        for filename in os.listdir("data"):
+            file_to_remove = os.path.join("data", filename)
+            if os.path.isfile(file_to_remove):
+                os.remove(file_to_remove)
 
         for uploaded_file in uploaded_files:
-
             file_path = os.path.join("data", uploaded_file.name)
-
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
         with st.spinner("Extracting text, chunking, and building the FAISS index..."):
-
             docs = load_documents()
-
             chunks = split_documents(docs)
-
             db = create_vectorstore(chunks)
 
             llm, retriever = create_rag_chain(db, model_name=selected_model)
@@ -869,8 +736,6 @@ if process_button:
             st.session_state.doc_names = [f.name for f in uploaded_files]
             st.session_state.chunk_count = len(chunks)
 
-            # Reset conversational memory whenever the knowledge base changes,
-            # since prior follow-up context no longer applies to a new corpus.
             if ConversationMemory:
                 st.session_state.memory = ConversationMemory()
 
@@ -881,9 +746,7 @@ if process_button:
 # Chat History
 # =====================================
 for message in st.session_state.messages:
-
     with st.chat_message(message["role"]):
-
         if message["role"] == "assistant" and message.get("agent"):
             meta = AGENT_META.get(message["agent"])
             if meta:
@@ -891,43 +754,36 @@ for message in st.session_state.messages:
                     f'<span class="agent-badge">{meta["icon"]} {meta["label"]}</span>',
                     unsafe_allow_html=True
                 )
-
         st.markdown(message["content"])
 
 # =====================================
 # Chat Input
 # =====================================
-user_question = st.chat_input(
-    "Ask DocPilot anything about your uploaded documents..."
-)
+user_question = st.chat_input("Ask DocPilot anything about your uploaded documents...")
 
 if user_question:
 
-    st.session_state.messages.append(
-        {
-            "role": "user",
-            "content": user_question
-        }
-    )
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_question
+    })
 
     with st.chat_message("user"):
         st.markdown(user_question)
 
     agent_used = None
 
-    if not st.session_state.rag_ready:
-
+    if not api_key:
+        reply = "⚠️ `GROQ_API_KEY` is missing. Please add it to your environment or secrets."
+    elif not st.session_state.rag_ready:
         reply = "Please upload and process your documents first. I don't have a knowledge base to work with yet."
-
     else:
-
         chat_history = _get_recent_chat_history()
 
-        # Re-initialize LLM and Planner dynamically based on sidebar model selection
+        # Re-initialize LLM and Planner dynamically based on model selector
         from langchain_groq import ChatGroq
-        from utils.rag_chain import _get_api_key
         st.session_state.llm = ChatGroq(
-            api_key=_get_api_key(),
+            api_key=api_key,
             model_name=selected_model,
             temperature=0
         )
@@ -938,7 +794,6 @@ if user_question:
 
         task = INTENT_TO_HANDLER.get(intent, "retrieve")
         agent_used = intent if intent in AGENT_META else "retrieve"
-
         st.session_state.last_agent = task
 
         agent_label = AGENT_META.get(agent_used, AGENT_META["retrieve"])["label"]
@@ -993,18 +848,14 @@ if user_question:
                 )
                 reply = format_retrieve_response(raw_reply)
 
-        # Persist the exchange in conversational memory, if available, so
-        # follow-up questions can be answered with context.
         if st.session_state.memory and hasattr(st.session_state.memory, "add_exchange"):
             st.session_state.memory.add_exchange(user_question, reply)
 
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": reply,
-            "agent": agent_used
-        }
-    )
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": reply,
+        "agent": agent_used
+    })
 
     with st.chat_message("assistant"):
         if agent_used and agent_used in AGENT_META:
